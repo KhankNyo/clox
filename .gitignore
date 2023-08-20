@@ -1,0 +1,9 @@
+
+
+.vs
+*.swp
+bin
+obj
+test
+
+
