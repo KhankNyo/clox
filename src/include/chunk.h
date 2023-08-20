@@ -20,12 +20,12 @@ typedef struct Chunk_t
 	size_t capacity;
 
 	ValueArr_t consts;
-	LineInfo line_info;
+	LineInfo_t line_info;
 } Chunk_t;
 
 
 /* set all members to 0 */
-void Chunk_Init(Chunk_t* chunk);
+void Chunk_Init(Chunk_t* chunk, uint32_t line_start);
 
 /* writes an op byte to the chunk's code */
 void Chunk_Write(Chunk_t* chunk, uint8_t byte, uint32_t line);

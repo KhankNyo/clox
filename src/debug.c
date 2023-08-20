@@ -1,6 +1,8 @@
 
 
 #include <stdio.h>
+
+#include "include/line.h"
 #include "include/chunk.h"
 #include "include/debug.h"
 
@@ -33,13 +35,16 @@ size_t Disasm_Instruction(FILE* fout, Chunk_t* chunk, size_t offset)
 
 	
 	/* fancy line formatting */
-	if (offset > 0 && chunk->lines[offset] == chunk->lines[offset - 1])
+	static uint32_t last_line = 0;
+	const uint32_t curr_line = LineInfo_GetLine(chunk->line_info, offset);
+	if (last_line != curr_line)
 	{
-		fprintf(fout, "   | ");
+		fprintf(fout, "%4d ", curr_line);
+		last_line = curr_line;
 	}
 	else
 	{
-		fprintf(fout, "%4d ", chunk->lines[offset]);
+		fprintf(fout, "   | ");
 	}
 
 

@@ -8,7 +8,7 @@
 int main(void)
 {
 	Chunk_t chunk;
-	Chunk_Init(&chunk);
+	Chunk_Init(&chunk, 123);
 	{
 		const size_t const_addr = Chunk_AddConstant(&chunk, 1.2);
 		Chunk_Write(&chunk, OP_CONSTANT, 123);
