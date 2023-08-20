@@ -10,7 +10,7 @@ else
 	EXEC_FMT=
 endif
 
-SRCS=$(wildcard src/*)
+SRCS=$(wildcard src/*.c)
 OBJS=$(patsubst src/%.c,obj/%.o,$(SRCS))
 OUTPUT=bin/main$(EXEC_FMT)
 
