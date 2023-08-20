@@ -7,6 +7,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include <stdio.h>
+
 
 #endif /* _CLOX_COMMON_H_ */
 
