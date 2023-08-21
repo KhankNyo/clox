@@ -4,10 +4,18 @@
 
 #include "common.h"
 #include "chunk.h"
+#include "value.h"
+
+
+#define VM_STACK_MAX 256
+
 
 typedef struct VM_t
 {
     Chunk_t* chunk;
+    uint8_t* ip;
+    Value_t stack[VM_STACK_MAX];
+    Value_t* sp;
 } VM_t;
 
 typedef enum InterpretResult_t
@@ -19,10 +27,9 @@ typedef enum InterpretResult_t
 
 
 void VM_Init(VM_t* vm);
-
-InterpretResult_t VM_Interpret(Chunk_t* chunk);
-
 void VM_Free(VM_t* vm);
+
+InterpretResult_t VM_Interpret(VM_t* vm, Chunk_t* chunk);
 
 
 #endif /* _CLOX_VM_H_ */
