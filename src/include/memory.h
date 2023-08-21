@@ -15,9 +15,6 @@ typedef struct Allocator_t
 } Allocator_t;
 
 
-/* TODO: thread safe */
-extern Allocator_t g_alloc;
-
 
 
 /* CLox macros */
@@ -25,19 +22,15 @@ extern Allocator_t g_alloc;
 #define GROW_CAPACITY(cap)\
 	((cap) < 8 ? 8 : (cap) * 2)
 
-#define GROW_ARRAY(type, ptr, oldsize, newsize)\
-	Allocator_Reallocate(&g_alloc, ptr, (oldsize) * (sizeof(type)), newsize * sizeof(type))
+#define GROW_ARRAY(p_allocator, type, ptr, oldsize, newsize)\
+	Allocator_Reallocate(p_allocator, ptr, (oldsize) * (sizeof(type)), newsize * sizeof(type))
 
-#define FREE_ARRAY(type, ptr, oldsize)\
-	Allocator_Reallocate(&g_alloc, ptr, sizeof(type) * (oldsize), 0)
+#define FREE_ARRAY(p_allocator, type, ptr, oldsize)\
+	Allocator_Reallocate(p_allocator, ptr, sizeof(type) * (oldsize), 0)
 
 
 /* global allocator macro */
 
-#define GALLOCATOR_INIT(initial_capacity) Allocator_Init(&g_alloc, initial_capacity)
-#define GALLOC(nbyte) Allocator_Alloc(&g_alloc, nbyte)
-#define GFREE(ptr) Allocator_Free(&g_alloc, ptr)
-#define GALLOCATOR_DESTROY() Allocator_KillEmAll(&g_alloc)
 
 
 

@@ -6,12 +6,13 @@
 
 
 
-void LineInfo_Init(LineInfo_t* li, uint32_t start)
+void LineInfo_Init(LineInfo_t* li, Allocator_t* alloc, uint32_t start)
 {
 	li->changes = NULL;
 	li->count = 0;
 	li->capacity = 0;
 	li->start = start;
+	li->alloc = alloc;
 }
 	
 
@@ -21,7 +22,9 @@ void LineInfo_Write(LineInfo_t* li, size_t ins_offset)
 	{
 		const size_t oldcap = li->capacity;
 		li->capacity = GROW_CAPACITY(li->capacity);
-		li->changes = GROW_ARRAY(size_t, li->changes, oldcap, li->capacity);
+		li->changes = GROW_ARRAY(li->alloc, size_t, 
+			li->changes, oldcap, li->capacity
+		);
 	}
 
 	li->changes[li->count] = ins_offset;
@@ -61,7 +64,7 @@ uint32_t LineInfo_GetLine(const LineInfo_t li, size_t offset)
 void LineInfo_Free(LineInfo_t* li)
 {
 	const uint32_t start = li->start;
-	FREE_ARRAY(size_t, li->changes, li->capacity);
-	LineInfo_Init(li, start);
+	FREE_ARRAY(li->alloc, size_t, li->changes, li->capacity);
+	LineInfo_Init(li, li->alloc, start);
 }
 

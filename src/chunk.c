@@ -7,14 +7,15 @@
 
 
 
-void Chunk_Init(Chunk_t* chunk, uint32_t line_start)
+void Chunk_Init(Chunk_t* chunk, Allocator_t* alloc, uint32_t line_start)
 {
 	chunk->code = NULL;
 	chunk->size = 0;
 	chunk->capacity = 0;
+	chunk->alloc = alloc;
 
-	LineInfo_Init(&chunk->line_info, line_start);
-	ValArr_Init(&chunk->consts);
+	LineInfo_Init(&chunk->line_info, alloc, line_start);
+	ValArr_Init(&chunk->consts, alloc);
 }
 
 
@@ -32,7 +33,8 @@ void Chunk_Write(Chunk_t* chunk, uint8_t byte, uint32_t line)
 	{
 		const size_t oldcap = chunk->capacity;
 		chunk->capacity = GROW_CAPACITY(chunk->capacity);
-		chunk->code = GROW_ARRAY(uint8_t, chunk->code, oldcap, chunk->capacity);
+		chunk->code = GROW_ARRAY(chunk->alloc, uint8_t, 
+			chunk->code, oldcap, chunk->capacity);
 	}
 
 	chunk->code[chunk->size] = byte;
@@ -73,10 +75,11 @@ void Chunk_WriteConstant(Chunk_t* chunk, Value_t constant, uint32_t line)
 void Chunk_Free(Chunk_t* chunk)
 {
 	uint32_t line_start = chunk->line_info.start;
-	FREE_ARRAY(uint8_t, chunk->code, chunk->capacity);
+
+	FREE_ARRAY(chunk->alloc, uint8_t, chunk->code, chunk->capacity);
 	LineInfo_Free(&chunk->line_info);
 	ValArr_Free(&chunk->consts);
 
-	Chunk_Init(chunk, line_start);
+	Chunk_Init(chunk, chunk->alloc, line_start);
 }
 

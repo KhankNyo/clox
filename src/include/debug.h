@@ -12,11 +12,11 @@
 
 
 /* disassembles a chunk of instructions */
-void Disasm_Chunk(FILE* fout, Chunk_t* cnk, const char* name);
+void Disasm_Chunk(FILE* fout, const Chunk_t* cnk, const char* name);
 
 
 /* disassembles a single instruction */
-size_t Disasm_Instruction(FILE* fout, Chunk_t* cnk, size_t offset);
+size_t Disasm_Instruction(FILE* fout, const Chunk_t* cnk, size_t offset);
 
 
 #endif /* _CLOX_DEBUG_H_ */

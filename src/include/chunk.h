@@ -5,6 +5,7 @@
 #include "line.h"
 #include "common.h"
 #include "value.h"
+#include "memory.h"
 
 typedef enum Opc_t
 {
@@ -20,6 +21,7 @@ typedef enum Opc_t
 
 typedef struct Chunk_t
 {
+	Allocator_t* alloc;
 	uint8_t* code;
 	size_t size;
 	size_t capacity;
@@ -30,7 +32,7 @@ typedef struct Chunk_t
 
 
 /* set all members to 0 */
-void Chunk_Init(Chunk_t* chunk, uint32_t line_start);
+void Chunk_Init(Chunk_t* chunk, Allocator_t* alloc, uint32_t line_start);
 
 /* writes an op byte to the chunk's code */
 void Chunk_Write(Chunk_t* chunk, uint8_t byte, uint32_t line);

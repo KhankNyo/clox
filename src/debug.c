@@ -11,10 +11,10 @@
 /* all returns next offset */
 
 static size_t singleByte(FILE* fout, const char* menmonic, size_t offset);
-static size_t constInstruction(FILE* fout, const char* mnemonic, Chunk_t* chunk, size_t offset, unsigned addr_size);
+static size_t constInstruction(FILE* fout, const char* mnemonic, const Chunk_t* chunk, size_t offset, unsigned addr_size);
 
 
-void Disasm_Chunk(FILE* fout, Chunk_t* chunk, const char* name)
+void Disasm_Chunk(FILE* fout, const Chunk_t* chunk, const char* name)
 {
 	fprintf(fout, "== %s ==\n", name);
 
@@ -28,7 +28,7 @@ void Disasm_Chunk(FILE* fout, Chunk_t* chunk, const char* name)
 
 
 
-size_t Disasm_Instruction(FILE* fout, Chunk_t* chunk, size_t offset)
+size_t Disasm_Instruction(FILE* fout, const Chunk_t* chunk, size_t offset)
 {
 	/* ins offset num */
 	fprintf(fout, "%04zu ", offset);
@@ -86,7 +86,9 @@ static size_t singleByte(FILE* fout, const char* mnemonic, size_t offset)
 }
 
 
-static size_t constInstruction(FILE* fout, const char* mnemonic, Chunk_t* chunk, size_t offset, unsigned addr_size)
+static size_t constInstruction(FILE* fout, 
+	const char* mnemonic, const Chunk_t* chunk, 
+	size_t offset, unsigned addr_size)
 {
 	uint32_t const_addr = 0;
 	for (unsigned i = 0; i < addr_size; i++)

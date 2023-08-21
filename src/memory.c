@@ -10,12 +10,28 @@
 
 
 
+#if  defined(DEBUG)
+#  define BUFFER_ALLOCATION_CHK
+#  define MAGIC_FRONT_VALUE 0xdeadbeef
+#  define MAGIC_BACK_VALUE 0xbadf00d
+#endif /* DEBUG */
+
+
+
 Allocator_t g_alloc = { 0 };
 
 struct FreeHeader_t
 {
+#ifdef BUFFER_ALLOCATION_CHK
+	uint32_t _magic_front;
+#endif /* BUFFER_ALLOCATION_CHK */
+
 	bufsize_t capacity;
 	FreeHeader_t* next;
+
+#ifdef BUFFER_ALLOCATION_CHK
+	uint32_t _magic_back;
+#endif /* BUFFER_ALLOCATION_CHK */ 
 };
 
 
@@ -81,6 +97,14 @@ void* Allocator_Alloc(Allocator_t* allocator, bufsize_t nbytes)
 		);
 		exit(EXIT_FAILURE);
 	}
+
+
+#ifdef BUFFER_ALLOCATION_CHK
+	node->_magic_front = MAGIC_FRONT_VALUE;
+	node->_magic_back = MAGIC_BACK_VALUE;
+#endif /* BUFFER_ALLOCATION_CHK */
+
+
 	return GET_PTR(node);
 }
 
@@ -120,6 +144,22 @@ void* Allocator_Reallocate(Allocator_t* alloc, void* ptr, bufsize_t oldsize, buf
 
 void Allocator_Free(Allocator_t* allocator, void* ptr)
 {
+#ifdef BUFFER_ALLOCATION_CHK
+	FreeHeader_t* header = GET_HEADER(ptr);
+	if (header->_magic_front != MAGIC_FRONT_VALUE)
+	{
+		fprintf(stderr, "Header of buffer at location %p was overwritten with %x\n", ptr, header->_magic_front);
+		abort();
+	}
+	
+	if (header->_magic_back != MAGIC_BACK_VALUE)
+	{
+		fprintf(stderr, "Back of eader of buffer at location %p was overwritten with %x\n", ptr, header->_magic_back);
+		abort();
+	}
+#endif /* BUFFER_ALLOCATION_CHK */
+
+
 	insert_free_node(allocator, GET_HEADER(ptr));
 }
 
