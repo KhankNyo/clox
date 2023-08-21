@@ -10,6 +10,13 @@
 #include <stdio.h>
 
 
+#ifdef DEBUG
+#  define DEBUG_TRACE_EXECUTION
+
+#endif /* DEBUG */
+
+
+
 #endif /* _CLOX_COMMON_H_ */
 
 
