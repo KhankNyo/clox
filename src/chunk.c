@@ -48,6 +48,27 @@ size_t Chunk_AddConstant(Chunk_t* chunk, Value_t constant)
 
 
 
+void Chunk_WriteConstant(Chunk_t* chunk, Value_t constant, uint32_t line)
+{
+	ValArr_Write(&chunk->consts, constant);
+	const size_t addr = chunk->consts.size - 1;
+
+	if (addr > UINT8_MAX)
+	{
+		Chunk_Write(chunk, OP_CONSTANT_LONG, line);
+		Chunk_Write(chunk, addr >> 0, line);
+		Chunk_Write(chunk, addr >> 8, line);
+		Chunk_Write(chunk, addr >> 16, line);
+	}
+	else
+	{
+		Chunk_Write(chunk, OP_CONSTANT, line);
+		Chunk_Write(chunk, addr, line);
+	}
+}
+
+
+
 
 void Chunk_Free(Chunk_t* chunk)
 {

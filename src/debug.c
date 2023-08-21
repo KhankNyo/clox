@@ -11,7 +11,7 @@
 /* all returns next offset */
 
 static size_t singleByte(FILE* fout, const char* menmonic, size_t offset);
-static size_t constInstruction(FILE* fout, const char* mnemonic, Chunk_t* chunk, size_t offset);
+static size_t constInstruction(FILE* fout, const char* mnemonic, Chunk_t* chunk, size_t offset, unsigned addr_size);
 
 
 void Disasm_Chunk(FILE* fout, Chunk_t* chunk, const char* name)
@@ -58,12 +58,16 @@ size_t Disasm_Instruction(FILE* fout, Chunk_t* chunk, size_t offset)
 		break;
 
 	case OP_CONSTANT:
-		offset = constInstruction(fout, "OP_CONSTANT", chunk, offset);
+		offset = constInstruction(fout, "OP_CONSTANT", chunk, offset, 1);
 		break;
 
 	default:
 		fprintf(fout, "Unknown opcode %d", ins);
 		offset += 1;
+		break;
+
+	case OP_CONSTANT_LONG:
+		offset = constInstruction(fout, "OP_CNST_LONG", chunk, offset, 3);
 		break;
 	}
 	putc('\n', fout);
@@ -82,9 +86,14 @@ static size_t singleByte(FILE* fout, const char* mnemonic, size_t offset)
 }
 
 
-static size_t constInstruction(FILE* fout, const char* mnemonic, Chunk_t* chunk, size_t offset)
+static size_t constInstruction(FILE* fout, const char* mnemonic, Chunk_t* chunk, size_t offset, unsigned addr_size)
 {
-	const uint8_t const_addr = chunk->code[offset + 1];
+	uint32_t const_addr = 0;
+	for (unsigned i = 0; i < addr_size; i++)
+	{
+		const_addr |= (uint32_t)chunk->code[offset + i] << 8;
+	}
+
 	fprintf(fout, "%-16s %4d ", mnemonic, const_addr);
 	printVal(fout, chunk->consts.vals[const_addr]);
 	return offset + 2;

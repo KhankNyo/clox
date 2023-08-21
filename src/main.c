@@ -1,12 +1,17 @@
 
 
 #include <stdio.h>
+#include <string.h>
+#include <assert.h>
+
+#include "include/memory.h"
 #include "include/debug.h"
 #include "include/chunk.h"
 
 
 int main(void)
 {
+	GALLOCATOR_INIT(1024 * 5);
 	Chunk_t chunk;
 	Chunk_Init(&chunk, 123);
 	{
@@ -17,6 +22,7 @@ int main(void)
 	}
 	Disasm_Chunk(stdout, &chunk, "test chunk");
 	Chunk_Free(&chunk);
+	GALLOCATOR_DESTROY();
 	return 0;
 }
 
