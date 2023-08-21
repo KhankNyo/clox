@@ -13,6 +13,7 @@ void Chunk_Init(Chunk_t* chunk, Allocator_t* alloc, uint32_t line_start)
 	chunk->size = 0;
 	chunk->capacity = 0;
 	chunk->alloc = alloc;
+	chunk->prevline = 0;
 
 	LineInfo_Init(&chunk->line_info, alloc, line_start);
 	ValArr_Init(&chunk->consts, alloc);
@@ -21,10 +22,9 @@ void Chunk_Init(Chunk_t* chunk, Allocator_t* alloc, uint32_t line_start)
 
 void Chunk_Write(Chunk_t* chunk, uint8_t byte, uint32_t line)
 {
-	static uint32_t prevline = 0;
-	if (line != prevline)
+	if (line != chunk->prevline)
 	{
-		prevline = line;
+		chunk->prevline = line;
 		LineInfo_Write(&chunk->line_info, chunk->size);
 	}
 

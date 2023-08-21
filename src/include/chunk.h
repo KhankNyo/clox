@@ -11,6 +11,11 @@ typedef enum Opc_t
 {
 	/* standard */
 	OP_CONSTANT,
+	OP_ADD,
+	OP_SUBTRACT,
+	OP_MULTIPLY,
+	OP_DIVIDE,
+	OP_NEGATE,
 	OP_RETURN,
 
 
@@ -28,6 +33,7 @@ typedef struct Chunk_t
 
 	ValueArr_t consts;
 	LineInfo_t line_info;
+	uint32_t prevline;
 } Chunk_t;
 
 
