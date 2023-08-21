@@ -61,6 +61,24 @@ size_t Disasm_Instruction(FILE* fout, const Chunk_t* chunk, size_t offset)
 		offset = constInstruction(fout, "OP_CONSTANT", chunk, offset, 1);
 		break;
 
+	case OP_NEGATE:
+		offset = singleByte(fout, "OP_NEGATE", offset);
+		break;
+	case OP_ADD:
+		offset = singleByte(fout, "OP_ADD", offset);
+		break;
+	case OP_SUBTRACT:
+		offset = singleByte(fout, "OP_SUBTRACT", offset);
+		break;
+	case OP_MULTIPLY:
+		offset = singleByte(fout, "OP_MULTIPLY", offset);
+		break;
+	case OP_DIVIDE:
+		offset = singleByte(fout, "OP_DIVIDE", offset);
+		break;
+
+
+
 	default:
 		fprintf(fout, "Unknown opcode %d", ins);
 		offset += 1;
