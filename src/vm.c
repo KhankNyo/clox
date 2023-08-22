@@ -78,8 +78,8 @@ do{\
         }
         break;
 
-        case OP_NEGATE:    *(vm->sp - 1) = -*(vm->sp - 1); break;
-        case OP_ADD:       BINARY_OP(+); break;
+        case OP_NEGATE:    push(vm, -pop(vm)); break;
+		case OP_ADD:       BINARY_OP(+); break;
         case OP_SUBTRACT:  BINARY_OP(-); break;
         case OP_MULTIPLY:  BINARY_OP(*); break;
         case OP_DIVIDE:    BINARY_OP(/); break;
