@@ -61,7 +61,7 @@ void Allocator_Free(Allocator_t* allocator, void* ptr);
 
 
 /* a wrapper around Allocator_Alloc and Allocator_Free
- *   oldsize	| newsize   | action
+ *   oldsize | newsize   | action
  *   0       | > 0       | allocates new buffer with newsize, returns ptr
  *   > 0     | 0         | frees ptr, returns NULL
  *   > 0     | < oldsize | shrinks buffer, return the same ptr
