@@ -13,6 +13,7 @@
 
 int main(void)
 {
+
 	Allocator_t alloc;
 	Allocator_Init(&alloc, 5 * 1024);
 
