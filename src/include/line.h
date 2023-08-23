@@ -7,12 +7,12 @@
 #include "common.h"
 #include "memory.h"
 
-
+typedef uint32_t line_t;
 typedef struct LineInfo_t
 {
 	Allocator_t* alloc;
 	size_t* changes;	/* stores the offset of the isntruction that contains line changes */
-	uint32_t count;
+	line_t count;
 	uint32_t capacity;
 	uint32_t start;
 
@@ -20,7 +20,7 @@ typedef struct LineInfo_t
 
 
 
-void LineInfo_Init(LineInfo_t* li, Allocator_t* alloc, uint32_t line_start);
+void LineInfo_Init(LineInfo_t* li, Allocator_t* alloc, line_t line_start);
 
 /* writes the instruction offset where the line changes */
 /* 

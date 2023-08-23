@@ -6,7 +6,7 @@
 
 
 
-void LineInfo_Init(LineInfo_t* li, Allocator_t* alloc, uint32_t start)
+void LineInfo_Init(LineInfo_t* li, Allocator_t* alloc, line_t start)
 {
 	li->changes = NULL;
 	li->count = 0;
@@ -39,9 +39,9 @@ uint32_t LineInfo_GetLine(const LineInfo_t li, size_t offset)
 		return li.start + li.count - 1;
 
 
-	uint32_t start = 0;
-	uint32_t end = li.count;
-	uint32_t midpoint = 0;
+	line_t start = 0;
+	line_t end = li.count;
+	line_t midpoint = 0;
 
 	/* binary search, instruction offsets are guaranteed to be pushed in ascending order */
 	while (start < end)
@@ -63,7 +63,7 @@ uint32_t LineInfo_GetLine(const LineInfo_t li, size_t offset)
 
 void LineInfo_Free(LineInfo_t* li)
 {
-	const uint32_t start = li->start;
+	const line_t start = li->start;
 	FREE_ARRAY(li->alloc, size_t, li->changes, li->capacity);
 	LineInfo_Init(li, li->alloc, start);
 }
