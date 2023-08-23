@@ -8,9 +8,9 @@
 
 
 
-/* all returns next offset */
-
+/* \returns next offset */
 static size_t singleByte(FILE* fout, const char* menmonic, size_t offset);
+/* \returns next offset */
 static size_t constInstruction(FILE* fout, const char* mnemonic, const Chunk_t* chunk, size_t offset, unsigned addr_size);
 
 
@@ -108,13 +108,13 @@ static size_t constInstruction(FILE* fout,
 	const char* mnemonic, const Chunk_t* chunk, 
 	size_t offset, unsigned addr_size)
 {
-	uint32_t const_addr = 0;
+	size_t const_addr = 0;
 	for (unsigned i = 0; i < addr_size; i++)
 	{
-		const_addr |= (uint32_t)chunk->code[offset + i] << 8;
+		const_addr |= (size_t)chunk->code[offset + i] << 8;
 	}
 
-	fprintf(fout, "%-16s %4d ", mnemonic, const_addr);
+	fprintf(fout, "%-16s %4zu ", mnemonic, const_addr);
 	printVal(fout, chunk->consts.vals[const_addr]);
 	return offset + 2;
 }
