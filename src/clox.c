@@ -58,7 +58,7 @@ void Clox_Repl(Clox_t* clox)
             printf("\n");
             break;
         }
-        else if (strncmp(line, "exit", sizeof("exit")) == 0)
+        else if (strncmp(line, "exit\n", sizeof("exit")) == 0)
         {
             break;
         }

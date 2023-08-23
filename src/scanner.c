@@ -206,7 +206,7 @@ Token_t Scanner_ScanToken(Scanner_t* scanner)
 
 static bool is_at_end(const Scanner_t* scanner)
 {
-    return *scanner->curr != '\0';
+    return *scanner->curr == '\0';
 }
 
 
@@ -381,6 +381,16 @@ static Token_t identifier_token(Scanner_t* scanner)
 
 static TokenType_t chk_iden_type(Scanner_t* scanner)
 {
+    /* good quote */
+    /*
+        We sometimes fall into the trap of thinking 
+        that performance comes from complicated 
+        data structures, layers of caching, and other 
+        fancy optimizations. But, many times, all 
+        that’s required is to do less work, and I often 
+        find that writing the simplest code I can is 
+        sufficient to accomplish that.
+    */
     switch (scanner->start[0]) 
     {
         case 'a': return chk_keyword(scanner, 1, 2, "nd", TOKEN_AND);
