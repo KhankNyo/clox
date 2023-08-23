@@ -10,8 +10,6 @@
 
 static InterpretResult_t run(VM_t* vm);
 static void stack_reset(VM_t* vm);
-static void push(VM_t* vm, Value_t val);
-static Value_t pop(VM_t* vm);
 
 
 
@@ -31,12 +29,37 @@ void VM_Free(VM_t* vm)
 
 
 
-InterpretResult_t VM_Interpret(VM_t* vm, Chunk_t* chunk)
+
+void VM_Push(VM_t* vm, Value_t val)
 {
-    vm->chunk = chunk;
-    vm->ip = chunk->code;
-    return run(vm);
+    *vm->sp = val;
+    vm->sp++;
 }
+
+
+Value_t VM_Pop(VM_t* vm)
+{
+    vm->sp--;
+    return *vm->sp;
+}
+
+
+
+InterpretResult_t VM_Interpret(VM_t* vm, const char* src, size_t src_size)
+{
+    Compile(src, src_size);
+    return INTERPRET_OK;
+}
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -47,9 +70,9 @@ static InterpretResult_t run(VM_t* vm)
 #define READ_CONSTANT() (vm->chunk->consts.vals[READ_BYTE()])
 #define BINARY_OP(op) \
 do{\
-    Value_t b = pop(vm);\
-    Value_t a = pop(vm);\
-    push(vm, a op b);\
+    Value_t b = VM_Pop(vm);\
+    Value_t a = VM_Pop(vm);\
+    VM_Push(vm, a op b);\
 }while(0)
 
 
@@ -74,11 +97,11 @@ do{\
         case OP_CONSTANT:
         {
             const Value_t constant = READ_CONSTANT();
-            push(vm, constant);
+            VM_Push(vm, constant);
         }
         break;
 
-        case OP_NEGATE:    push(vm, -pop(vm)); break;
+        case OP_NEGATE:    VM_Push(vm, -VM_Pop(vm)); break;
 		case OP_ADD:       BINARY_OP(+); break;
         case OP_SUBTRACT:  BINARY_OP(-); break;
         case OP_MULTIPLY:  BINARY_OP(*); break;
@@ -87,8 +110,8 @@ do{\
 
         case OP_RETURN:
         {
-            pop(vm);
-            //printVal(stderr, pop(vm));
+            VM_Pop(vm);
+            //printVal(stderr, VM_Pop(vm));
             //puts("");
             return INTERPRET_OK;
         }
@@ -111,18 +134,7 @@ static void stack_reset(VM_t* vm)
 }
 
 
-static void push(VM_t* vm, Value_t val)
-{
-    *vm->sp = val;
-    vm->sp++;
-}
 
-
-static Value_t pop(VM_t* vm)
-{
-    vm->sp--;
-    return *vm->sp;
-}
 
 
 

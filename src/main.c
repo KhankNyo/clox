@@ -2,56 +2,34 @@
 
 #include <stdio.h>
 #include <string.h>
-#include <assert.h>
-#include <time.h>
+#include <stdlib.h>
 
-#include "include/memory.h"
-#include "include/debug.h"
-#include "include/chunk.h"
-#include "include/vm.h"
+#include "include/clox.h"
 
 
-int main(void)
+int main(int argc, char** argv)
 {
-
-	Allocator_t alloc;
-	Allocator_Init(&alloc, 5 * 1024);
-
-	VM_t vm;
-	VM_Init(&vm);
-
+	Clox_t clox;
+	Clox_Init(&clox, 5 * 1024);
 	
-	Chunk_t chunk;
-	Chunk_Init(&chunk, &alloc, 123);
+	if (1 == argc)
 	{
-		Chunk_WriteConstant(&chunk, 3.4, 123);
-		Chunk_Write(&chunk, OP_NEGATE, 123);
-		Chunk_Write(&chunk, OP_RETURN, 123);
-
-		Chunk_WriteConstant(&chunk, 1.2, 123);
-		Chunk_WriteConstant(&chunk, 3.4, 123);
-		Chunk_Write(&chunk, OP_ADD, 123);
-
-		Chunk_WriteConstant(&chunk, 5.6, 123);
-		Chunk_Write(&chunk, OP_DIVIDE, 123);
-
-		Chunk_Write(&chunk, OP_NEGATE, 123);
-		Chunk_Write(&chunk, OP_RETURN, 123);
+		Clox_Repl(&clox);
+	}
+	else if (2 == argc)
+	{
+		Clox_RunFile(&clox, argv[1]);
+	}
+	else
+	{
+		Clox_PrintUsage(stderr, argv[0]);
+		exit(CLOX_UNIX_ENONET);	/* unix exit code for invalid usage */
 	}
 
-	for (int j = 0; j < 10; j++)
-	{
-		double start = clock();
-		for (size_t i = 0; i < 100000000; i++)
-			VM_Interpret(&vm, &chunk);
-		double t = clock() - start;
-		printf("Run #%d: %.03fms\n", j, t * 1000 / CLOCKS_PER_SEC);
-	}
 
-	Chunk_Free(&chunk);
-	VM_Free(&vm);
-
-	Allocator_KillEmAll(&alloc);
+	if (clox.err != CLOX_NOERR)
+		exit(clox.err);
+	Clox_Free(&clox);
 	return 0;
 }
 

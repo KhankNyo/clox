@@ -29,7 +29,10 @@ typedef enum InterpretResult_t
 void VM_Init(VM_t* vm);
 void VM_Free(VM_t* vm);
 
-InterpretResult_t VM_Interpret(VM_t* vm, Chunk_t* chunk);
+void VM_Push(VM_t* vm, Value_t val);
+Value_t VM_Pop(VM_t* vm);
+
+InterpretResult_t VM_Interpret(VM_t* vm, const char* src, size_t src_size);
 
 
 #endif /* _CLOX_VM_H_ */

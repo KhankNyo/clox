@@ -48,8 +48,8 @@ void Allocator_KillEmAll(Allocator_t* allocator);
 /* 
  *   \param 1 allocator: the allocator struct, must NOT be NULL
  *   \param 2 nbytes: the size of the buffer 
- *   \returns a buffer with the capacity specified by nbytes
- *   \returns NULL if out of memory or nbytes is zero
+ *   \returns always a valid buffer with the capacity specified by nbytes,
+ *	 if out of memory, this function will call exit(1); and will log a message to stderr
 */
 void* Allocator_Alloc(Allocator_t* allocator, bufsize_t nbytes);
 
@@ -62,9 +62,9 @@ void Allocator_Free(Allocator_t* allocator, void* ptr);
 
 /* a wrapper around Allocator_Alloc and Allocator_Free
  *   oldsize | newsize   | action
- *   0       | > 0       | allocates new buffer with newsize, returns ptr
- *   > 0     | 0         | frees ptr, returns NULL
- *   > 0     | < oldsize | shrinks buffer, return the same ptr
+ *   0       | > 0       | Allocator_Alloc
+ *   > 0     | 0         | Allocator_Free
+ *   > 0     | < oldsize | nop, returns ptr
  *   > 0     | > oldsize | reallocates ptr, return the same or a new ptr
  *   > 0     | ==oldsize | nop, returns NULL
  */
