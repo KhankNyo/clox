@@ -59,6 +59,7 @@ void Scanner_Init(Scanner_t* scanner, const char* src);
 
 
 /*
+*   scans a single token at a time
 *   \returns the scanned token
 */
 Token_t Scanner_ScanToken(Scanner_t* scanner);
