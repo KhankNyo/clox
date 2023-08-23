@@ -415,6 +415,7 @@ static TokenType_t chk_iden_type(Scanner_t* scanner)
                 }
             }
             break;
+        default: break;
     }
     return TOKEN_IDENTIFIER;
 }
