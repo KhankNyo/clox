@@ -26,3 +26,12 @@ void Scanner_Init(Scanner_t* scanner, const char* src, size_t src_size)
     scanner->curr = src;
     scanner->line = 1;
 }
+
+
+
+
+Token_t Scanner_ScanToken(Scanner_t* scanner)
+{
+
+}
+
