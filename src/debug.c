@@ -11,7 +11,9 @@
 /* \returns next offset */
 static size_t singleByte(FILE* fout, const char* menmonic, size_t offset);
 /* \returns next offset */
-static size_t constInstruction(FILE* fout, const char* mnemonic, const Chunk_t* chunk, size_t offset, unsigned addr_size);
+static size_t constInstruction(FILE* fout, 
+	const char* mnemonic, const Chunk_t* chunk, size_t offset, unsigned addr_size
+);
 
 
 void Disasm_Chunk(FILE* fout, const Chunk_t* chunk, const char* name)
@@ -35,8 +37,8 @@ size_t Disasm_Instruction(FILE* fout, const Chunk_t* chunk, size_t offset)
 
 	
 	/* fancy line formatting */
-	static uint32_t last_line = 0;
-	const uint32_t curr_line = LineInfo_GetLine(chunk->line_info, offset);
+	static line_t last_line = 0;
+	const line_t curr_line = LineInfo_GetLine(chunk->line_info, offset);
 	if (last_line != curr_line)
 	{
 		fprintf(fout, "%4d ", curr_line);
