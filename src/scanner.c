@@ -66,12 +66,13 @@ static char peek_next(const Scanner_t* scanner, int offset);
 
 
 /*
-*
+*	\returns a string literal token
 */
 static Token_t string_token(Scanner_t* scanner);
 
 
 
+static Token_t number_token(Scanner_t* scanner);
 
 
 
@@ -85,7 +86,8 @@ static Token_t string_token(Scanner_t* scanner);
 
 
 
-void Scanner_Init(Scanner_t* scanner, const char* src, size_t src_size)
+
+void Scanner_Init(Scanner_t* scanner, const char* src)
 {
     scanner->start = src;
     scanner->curr = src;
@@ -151,7 +153,7 @@ Token_t Scanner_ScanToken(Scanner_t* scanner)
 
     }
     
-    return error_token("Unexpected token.");
+    return error_token(scanner, "Unexpected token.");
 }
 
 

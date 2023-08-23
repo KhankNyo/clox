@@ -5,7 +5,7 @@
 
 #include "common.h"
 
-void Compile(const char* src, size_t src_size);
+void Compile(const char* src);
 
 
 

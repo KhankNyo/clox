@@ -37,8 +37,8 @@ void Clox_RunFile(Clox_t* clox, const char* file_path)
 {
     size_t src_size = 0;
     char* src = load_file_content(&clox->alloc, file_path, &src_size);
-    InterpretResult_t ret = VM_Interpret(&clox->vm, src, src_size);
-    unload_file_content(&clox->alloc, file_path);
+    InterpretResult_t ret = VM_Interpret(&clox->vm, src);
+    unload_file_content(&clox->alloc, src);
 
     if (ret == INTERPRET_COMPILE_ERROR)
         clox->err = CLOX_UNIX_ENOPKG;

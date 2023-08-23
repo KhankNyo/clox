@@ -46,9 +46,9 @@ Value_t VM_Pop(VM_t* vm)
 
 
 
-InterpretResult_t VM_Interpret(VM_t* vm, const char* src, size_t src_size)
+InterpretResult_t VM_Interpret(VM_t* vm, const char* src)
 {
-    Compile(src, src_size);
+    Compile(src);
     return INTERPRET_OK;
 }
 

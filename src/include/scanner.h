@@ -55,7 +55,7 @@ typedef struct Token_t
 /*
 *   initializes scanner
 */
-void Scanner_Init(Scanner_t* scanner, const char* src, size_t src_size);
+void Scanner_Init(Scanner_t* scanner, const char* src);
 
 
 /*
