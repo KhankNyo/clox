@@ -65,7 +65,7 @@ void Allocator_Free(Allocator_t* allocator, void* ptr);
  *   0       | > 0       | Allocator_Alloc
  *   > 0     | 0         | Allocator_Free
  *   > 0     | < oldsize | nop, returns ptr
- *   > 0     | > oldsize | reallocates ptr, return the same or a new ptr
+ *   > 0     | > oldsize | reallocates ptr, return the same or a new ptr to a buf with the requested size
  *   > 0     | ==oldsize | nop, returns NULL
  */
 void* Allocator_Reallocate(Allocator_t* allocator, void* ptr, bufsize_t oldsize, bufsize_t newsize);

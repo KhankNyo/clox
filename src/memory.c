@@ -18,8 +18,6 @@
 
 
 
-Allocator_t g_alloc = { 0 };
-
 struct FreeHeader_t
 {
 #ifdef BUFFER_ALLOCATION_CHK
