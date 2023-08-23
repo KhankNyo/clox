@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include "include/common.h"
 #include "include/vm.h"
+#include "include/compiler.h"
 #include "include/debug.h"
 
 
