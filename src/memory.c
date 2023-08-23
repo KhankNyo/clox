@@ -145,7 +145,7 @@ void* Allocator_Reallocate(Allocator_t* alloc, void* ptr, bufsize_t oldsize, buf
 void Allocator_Free(Allocator_t* allocator, void* ptr)
 {
 #ifdef BUFFER_ALLOCATION_CHK
-	FreeHeader_t* header = GET_HEADER(ptr);
+	const FreeHeader_t* header = GET_HEADER(ptr);
 	if (header->_magic_front != MAGIC_FRONT_VALUE)
 	{
 		fprintf(stderr, "Header of buffer at location %p was overwritten with %x\n", ptr, header->_magic_front);
@@ -154,7 +154,7 @@ void Allocator_Free(Allocator_t* allocator, void* ptr)
 	
 	if (header->_magic_back != MAGIC_BACK_VALUE)
 	{
-		fprintf(stderr, "Back of eader of buffer at location %p was overwritten with %x\n", ptr, header->_magic_back);
+		fprintf(stderr, "Back of header of buffer at location %p was overwritten with %x\n", ptr, header->_magic_back);
 		abort();
 	}
 #endif /* BUFFER_ALLOCATION_CHK */
@@ -197,6 +197,10 @@ static FreeHeader_t* get_free_node(Allocator_t* allocator, bufsize_t nbytes)
 
 	if (NULL == curr)
 	{
+		/*
+			if we cannot find a free node with appropriate size, 
+			then we split the remaining buffer into the node we need and a free node
+		*/
 		Split_t split = split_free_buffer(nbytes,
 			&allocator->head[allocator->used_size], 
 			allocator->capacity - allocator->used_size
@@ -270,7 +274,7 @@ static Split_t split_free_buffer(bufsize_t new_node_capacity, uint8_t* bufstart,
 	
 	split.new_free_node = (FreeHeader_t*)&bufstart[new_node_capacity + sizeof(FreeHeader_t)];
 	split.new_free_node->next = NULL;
-	split.new_free_node->capacity = bufsize - new_node_capacity;
+	split.new_free_node->capacity = bufsize - new_node_capacity - sizeof(FreeHeader_t);
 	return split;
 }
 
