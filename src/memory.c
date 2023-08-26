@@ -13,7 +13,7 @@
 #if  defined(DEBUG)
 #  define BUFFER_ALLOCATION_CHK
 #  define MAGIC_FRONT_VALUE 0xdeadbeef
-#  define MAGIC_BACK_VALUE 0xbadf00d
+#  define MAGIC_BACK_VALUE 0xbaadf00d
 #endif /* DEBUG */
 
 
@@ -44,6 +44,7 @@ typedef struct Split_t
 static FreeHeader_t* get_free_node(Allocator_t* allocator, bufsize_t nbytes);
 static void insert_free_node(Allocator_t* allocator, FreeHeader_t* node);
 static Split_t split_free_buffer(bufsize_t new_node_capacity, uint8_t* bufstart, bufsize_t bufsize);
+static void set_header(FreeHeader_t* header, size_t capacity, FreeHeader_t* next);
 
 #define GET_HEADER(ptr) (FreeHeader_t*)(((uint8_t*)(ptr)) - sizeof(FreeHeader_t))
 #define GET_PTR(header_ptr) (((uint8_t*)(header_ptr)) + sizeof(FreeHeader_t))
@@ -95,12 +96,6 @@ void* Allocator_Alloc(Allocator_t* allocator, bufsize_t nbytes)
 		);
 		exit(EXIT_FAILURE);
 	}
-
-
-#ifdef BUFFER_ALLOCATION_CHK
-	node->_magic_front = MAGIC_FRONT_VALUE;
-	node->_magic_back = MAGIC_BACK_VALUE;
-#endif /* BUFFER_ALLOCATION_CHK */
 
 
 	return GET_PTR(node);
@@ -184,8 +179,22 @@ void Allocator_Free(Allocator_t* allocator, void* ptr)
 
 static FreeHeader_t* get_free_node(Allocator_t* allocator, bufsize_t nbytes)
 {
+	if (NULL == allocator->free_head)
+	{
+		Split_t split = split_free_buffer(nbytes, 
+			&allocator->head[allocator->used_size], 
+			allocator->capacity - allocator->used_size
+		);
+		if (split.new_free_node != NULL)
+		{
+			allocator->free_head = split.new_free_node;
+		}
+		return split.new_node;
+	}
+
+
+	FreeHeader_t* prev = NULL;
 	FreeHeader_t* curr = allocator->free_head;
-	FreeHeader_t* prev = allocator->free_head;
 	while (NULL != curr && curr->capacity < nbytes)
 	{
 		prev = curr;
@@ -193,35 +202,37 @@ static FreeHeader_t* get_free_node(Allocator_t* allocator, bufsize_t nbytes)
 	}
 
 
-	if (NULL == curr)
+	Split_t split = { 0 };
+	if (NULL == curr) /* no free buffer has enough capacity */
 	{
-		/*
-			if we cannot find a free node with appropriate size, 
-			then we split the remaining buffer into the node we need and a free node
-		*/
-		Split_t split = split_free_buffer(nbytes,
-			&allocator->head[allocator->used_size], 
+		split = split_free_buffer(nbytes,
+			&allocator->head[allocator->used_size],
 			allocator->capacity - allocator->used_size
 		);
-
-		if (NULL == allocator->free_head)
-		{
-			allocator->free_head = split.new_free_node;
-		}
-		else if (NULL != split.new_free_node)
-		{
-			insert_free_node(allocator, split.new_free_node);
-		}
-		return split.new_node;
 	}
+	else if (NULL == prev)	/* the first buffer have enough capacity */
+	{
+		FreeHeader_t* next = curr->next;
+		split = split_free_buffer(nbytes, (uint8_t*)curr, curr->capacity + sizeof(FreeHeader_t));
+		allocator->free_head = next;
+	}
+	else /* found a free buffer that has an appropriate size */
+	{
+		prev->next = curr->next;
+		split = split_free_buffer(nbytes, (uint8_t*)curr, curr->capacity + sizeof(FreeHeader_t));
+	}
+	
 
-	prev->next = curr->next;
-	curr->next = NULL;
-	return curr;
+	if (split.new_free_node != NULL)
+	{
+		insert_free_node(allocator, split.new_free_node);
+	}
+	return split.new_node;
 }
 
 
 
+/* TODO: replace size-order insertion with address-order insertion for coalessing later */
 static void insert_free_node(Allocator_t* allocator, FreeHeader_t* node)
 {
 	if (NULL == allocator->free_head)
@@ -237,8 +248,9 @@ static void insert_free_node(Allocator_t* allocator, FreeHeader_t* node)
 		prev = curr;
 		curr = curr->next;
 	}
+	CLOX_ASSERT(curr != node && "double free");
 
-	/* curr->size >= node->size */
+
 	if (NULL == prev)
 	{
 		node->next = curr;
@@ -263,7 +275,7 @@ static Split_t split_free_buffer(bufsize_t new_node_capacity, uint8_t* bufstart,
 
 
 	split.new_node = (FreeHeader_t*)bufstart;
-	split.new_node->capacity = new_node_capacity;
+	set_header(split.new_node, new_node_capacity, NULL);
 
 
 	/* if the other half is not big enough, new_free_node is NULL */
@@ -271,9 +283,21 @@ static Split_t split_free_buffer(bufsize_t new_node_capacity, uint8_t* bufstart,
 		return split;
 	
 	split.new_free_node = (FreeHeader_t*)&bufstart[new_node_capacity + sizeof(FreeHeader_t)];
-	split.new_free_node->next = NULL;
-	split.new_free_node->capacity = bufsize - new_node_capacity - sizeof(FreeHeader_t);
+	set_header(split.new_free_node, bufsize - new_node_capacity - sizeof(FreeHeader_t), NULL);
 	return split;
+}
+
+
+
+static void set_header(FreeHeader_t* header, size_t capacity, FreeHeader_t* next)
+{
+#ifdef BUFFER_ALLOCATION_CHK
+	header->_magic_back = MAGIC_BACK_VALUE;
+	header->_magic_front = MAGIC_FRONT_VALUE;
+#endif /* BUFFER_ALLOCATION_CHK */
+
+	header->next = next;
+	header->capacity = capacity;
 }
 
 
