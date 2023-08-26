@@ -1,5 +1,5 @@
 CC=gcc
-CCF=-Wall -Wextra -Wpedantic -g -Og -DDEBUG
+CCF=-Wall -std=c99 -Wextra -Wpedantic -g -Og -DDEBUG
 LDF=
 LIBS=
 
