@@ -113,12 +113,12 @@ static size_t constInstruction(FILE* fout,
 	size_t const_addr = 0;
 	for (unsigned i = 0; i < addr_size; i++)
 	{
-		const_addr |= (size_t)chunk->code[offset + i] << 8;
+		const_addr |= (size_t)chunk->code[offset + 1 + i] << 8*i;
 	}
 
 	fprintf(fout, "%-16s %4zu ", mnemonic, const_addr);
 	printVal(fout, chunk->consts.vals[const_addr]);
-	return offset + 2;
+	return offset + 1 + addr_size;
 }
 
 

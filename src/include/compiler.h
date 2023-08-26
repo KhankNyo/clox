@@ -4,8 +4,9 @@
 
 
 #include "common.h"
+#include "chunk.h"
 
-void Compile(const char* src);
+bool Compile(const char* src, Chunk_t* chunk);
 
 
 

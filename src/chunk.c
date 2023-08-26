@@ -50,7 +50,7 @@ size_t Chunk_AddConstant(Chunk_t* chunk, Value_t constant)
 
 
 
-void Chunk_WriteConstant(Chunk_t* chunk, Value_t constant, line_t line)
+size_t Chunk_WriteConstant(Chunk_t* chunk, Value_t constant, line_t line)
 {
 	ValArr_Write(&chunk->consts, constant);
 	const size_t addr = chunk->consts.size - 1;
@@ -67,6 +67,7 @@ void Chunk_WriteConstant(Chunk_t* chunk, Value_t constant, line_t line)
 		Chunk_Write(chunk, OP_CONSTANT, line);
 		Chunk_Write(chunk, addr, line);
 	}
+	return addr;
 }
 
 

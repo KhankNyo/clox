@@ -57,6 +57,11 @@ typedef struct Token_t
 */
 void Scanner_Init(Scanner_t* scanner, const char* src);
 
+/* 
+*   the scanner itself has no resource that need to be destroyed
+*/
+
+
 
 /*
 *   scans a single token at a time

@@ -41,10 +41,10 @@ uint32_t LineInfo_GetLine(const LineInfo_t li, size_t offset)
 
 	line_t start = 0;
 	line_t end = li.count;
-	line_t midpoint = 0;
+	line_t midpoint = 1;
 
 	/* binary search, instruction offsets are guaranteed to be pushed in ascending order */
-	while (start < end)
+	while ((start < end) && (start != midpoint))
 	{
 		midpoint = start + (end - start) / 2;
 		if (li.changes[midpoint] < offset)

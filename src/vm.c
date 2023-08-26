@@ -46,10 +46,24 @@ Value_t VM_Pop(VM_t* vm)
 
 
 
-InterpretResult_t VM_Interpret(VM_t* vm, const char* src)
+InterpretResult_t VM_Interpret(VM_t* vm, Allocator_t* alloc, const char* src)
 {
-    Compile(src);
-    return INTERPRET_OK;
+    CLOX_ASSERT(NULL != vm->sp && "call VM_Init before passing it to VM_Interpret.");
+    Chunk_t chunk;
+    Chunk_Init(&chunk, alloc, 1);
+
+    if (!Compile(src, &chunk))
+    {
+        Chunk_Free(&chunk);
+        return INTERPRET_COMPILE_ERROR;
+    }
+
+    vm->chunk = &chunk;
+    vm->ip = chunk.code;
+
+    InterpretResult_t ret = run(vm);
+    Chunk_Free(&chunk);
+    return ret;
 }
 
 
@@ -77,7 +91,7 @@ do{\
 }while(0)
 
 
-    while (1)
+    while (true)
     {
 
 #ifdef DEBUG_TRACE_EXECUTION
@@ -111,13 +125,12 @@ do{\
 
         case OP_RETURN:
         {
-            VM_Pop(vm);
-            //printVal(stderr, VM_Pop(vm));
-            //puts("");
+            printVal(stderr, VM_Pop(vm));
+            puts("");
             return INTERPRET_OK;
         }
 
-
+        default: break;
         }
     }
 

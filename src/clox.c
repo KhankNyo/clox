@@ -19,12 +19,14 @@ static void unload_file_content(Allocator_t* alloc, char* file_content);
 void Clox_Init(Clox_t *clox, size_t allocator_capacity)
 {
     Allocator_Init(&clox->alloc, allocator_capacity);
+    VM_Init(&clox->vm);
     clox->err = CLOX_NOERR;
 }
 
 
 void Clox_Free(Clox_t* clox)
 {
+    VM_Free(&clox->vm);
     Allocator_KillEmAll(&clox->alloc);
 }
 
@@ -37,7 +39,7 @@ void Clox_RunFile(Clox_t* clox, const char* file_path)
 {
     size_t src_size = 0;
     char* src = load_file_content(&clox->alloc, file_path, &src_size);
-    InterpretResult_t ret = VM_Interpret(&clox->vm, src);
+    InterpretResult_t ret = VM_Interpret(&clox->vm, &clox->alloc, src);
     unload_file_content(&clox->alloc, src);
 
     if (ret == INTERPRET_COMPILE_ERROR)
@@ -64,7 +66,7 @@ void Clox_Repl(Clox_t* clox)
         }
 
 
-        VM_Interpret(&clox->vm, line);
+        VM_Interpret(&clox->vm, &clox->alloc, line);
     }
 }
 

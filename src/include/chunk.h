@@ -7,6 +7,10 @@
 #include "value.h"
 #include "memory.h"
 
+
+/* maximum number of constant a chunk can have */
+#define MAX_CONST_IN_CHUNK 0xffffffu
+
 typedef enum Opc_t
 {
 	/* standard */
@@ -43,12 +47,16 @@ void Chunk_Init(Chunk_t* chunk, Allocator_t* alloc, line_t line_start);
 /* writes an op byte to the chunk's code */
 void Chunk_Write(Chunk_t* chunk, uint8_t byte, line_t line);
 
-/* adds a constant to the consts array */
+/* adds a constant to the consts array,
+*	\returns the offset of the constant in the value array
+*/
 size_t Chunk_AddConstant(Chunk_t* chunk, Value_t constant);
 
 
-/* adds a constant to the consts array and add an instruction loading that constant */
-void Chunk_WriteConstant(Chunk_t* chunk, Value_t constant, line_t line);
+/* adds a constant to the consts array and add an appropriate instruction for loading that constant,
+*	\returns the offset of the constant in the value array
+*/
+size_t Chunk_WriteConstant(Chunk_t* chunk, Value_t constant, line_t line);
 
 
 /* free and set all members to 0 */
