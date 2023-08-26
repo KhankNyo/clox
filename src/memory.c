@@ -49,7 +49,7 @@ static void set_header(FreeHeader_t* header, size_t capacity, FreeHeader_t* next
 #define GET_HEADER(ptr) (FreeHeader_t*)(((uint8_t*)(ptr)) - sizeof(FreeHeader_t))
 #define GET_PTR(header_ptr) (((uint8_t*)(header_ptr)) + sizeof(FreeHeader_t))
 
-#define MIN_SIZE 4
+#define MIN_SIZE 8
 #define MIN_BUF_SIZE (MIN_SIZE + sizeof(FreeHeader_t))
 
 

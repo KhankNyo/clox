@@ -1,4 +1,6 @@
 
+
+#include <float.h>
 #include "include/common.h"
 #include "include/memory.h"
 #include "include/value.h"
@@ -38,8 +40,33 @@ void ValArr_Free(ValueArr_t* valarr)
 }
 
 
-void printVal(FILE* fout, Value_t val)
+void Value_Print(FILE* fout, Value_t val)
 {
-	fprintf(fout, "'%g'", val);
+	switch (val.type)
+	{
+	case VAL_BOOL:		fprintf(fout, AS_BOOL(val) ? "true" : "false"); break;
+	case VAL_NIL:		fprintf(fout, "nil"); break;
+	case VAL_NUMBER:	fprintf(fout, "'%g'", AS_NUMBER(val)); break;
+	default: CLOX_ASSERT(false && "Unhandled Value_Print() case."); return;
+	}
+}
+
+
+bool Value_Equal(const Value_t a, const Value_t b)
+{
+	if (a.type != b.type)
+	{
+		return false;
+	}
+
+	switch (a.type)
+	{
+	case VAL_BOOL:		return AS_BOOL(a) == AS_BOOL(b);
+	case VAL_NIL:		return true;
+	case VAL_NUMBER:	
+		return (AS_NUMBER(a) - FLT_EPSILON <= AS_NUMBER(b))
+			&& (AS_NUMBER(b) <= AS_NUMBER(a) + FLT_EPSILON);
+	default: CLOX_ASSERT(false && "Unhandled Value_Equal() case"); return false;
+	}
 }
 

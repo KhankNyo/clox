@@ -251,7 +251,7 @@ static bool match(Scanner_t* scanner, char ch)
     }
 
     scanner->curr++;
-    return false;
+    return true;
 }
 
 

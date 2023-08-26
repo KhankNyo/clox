@@ -1,6 +1,8 @@
 
 
 #include <stdio.h>
+#include <stdarg.h>
+
 #include "include/common.h"
 #include "include/vm.h"
 #include "include/compiler.h"
@@ -11,6 +13,10 @@
 
 static InterpretResult_t run(VM_t* vm);
 static void stack_reset(VM_t* vm);
+static Value_t peek(const VM_t* vm, int offset);
+static bool is_falsey(const Value_t val);
+
+static void runtime_error(VM_t* vm, const char* fmt, ...);
 
 
 
@@ -83,11 +89,15 @@ static InterpretResult_t run(VM_t* vm)
 {
 #define READ_BYTE() (*vm->ip++)
 #define READ_CONSTANT() (vm->chunk->consts.vals[READ_BYTE()])
-#define BINARY_OP(op) \
+#define BINARY_OP(ValueType, op) \
 do{\
-    Value_t b = VM_Pop(vm);\
-    Value_t a = VM_Pop(vm);\
-    VM_Push(vm, a op b);\
+    if (!IS_NUMBER(peek(vm, 0)) || !IS_NUMBER(peek(vm, 1))) {\
+        runtime_error(vm, "Operands must be numbers.");\
+        return INTERPRET_RUNTIME_ERROR;\
+    }\
+    double b = AS_NUMBER(VM_Pop(vm));\
+    double a = AS_NUMBER(VM_Pop(vm));\
+    VM_Push(vm, ValueType(a op b));\
 }while(0)
 
 
@@ -98,7 +108,7 @@ do{\
         printf("          ");
         for (Value_t* slot = vm->stack; slot < vm->sp; slot++) {
             printf("[ ");
-            printVal(stderr, *slot);
+            Value_Print(stderr, *slot);
             printf(" ]");
         }
         printf("\n");
@@ -110,22 +120,49 @@ do{\
         {
 
         case OP_CONSTANT:
+        case OP_CONSTANT_LONG:
         {
             const Value_t constant = READ_CONSTANT();
             VM_Push(vm, constant);
         }
         break;
 
-        case OP_NEGATE:    VM_Push(vm, -VM_Pop(vm)); break;
-		case OP_ADD:       BINARY_OP(+); break;
-        case OP_SUBTRACT:  BINARY_OP(-); break;
-        case OP_MULTIPLY:  BINARY_OP(*); break;
-        case OP_DIVIDE:    BINARY_OP(/); break;
+        case OP_NEGATE:
+            if (!IS_NUMBER(peek(vm, 0)))
+            {
+                runtime_error(vm, "Operand must be a number.");
+                return INTERPRET_RUNTIME_ERROR;
+            }
+            VM_Push(vm, NUMBER_VAL(-AS_NUMBER(VM_Pop(vm)))); 
+            break;
+        case OP_NOT:
+            VM_Push(vm, BOOL_VAL(is_falsey(VM_Pop(vm))));
+            break;
 
+
+		case OP_ADD:        BINARY_OP(NUMBER_VAL, + ); break;
+        case OP_SUBTRACT:   BINARY_OP(NUMBER_VAL, - ); break;
+        case OP_MULTIPLY:   BINARY_OP(NUMBER_VAL, * ); break;
+        case OP_DIVIDE:     BINARY_OP(NUMBER_VAL, / ); break;
+
+        case OP_EQUAL:
+        {
+            Value_t b = VM_Pop(vm);
+            Value_t a = VM_Pop(vm);
+            VM_Push(vm, BOOL_VAL(Value_Equal(a, b)));
+        }
+        break;
+        case OP_GREATER:    BINARY_OP(BOOL_VAL, > ); break;
+        case OP_LESS:       BINARY_OP(BOOL_VAL, < ); break;
+
+
+        case OP_TRUE:       VM_Push(vm, BOOL_VAL(true)); break;
+        case OP_FALSE:      VM_Push(vm, BOOL_VAL(false)); break;
+        case OP_NIL:        VM_Push(vm, NIL_VAL()); break;
 
         case OP_RETURN:
         {
-            printVal(stderr, VM_Pop(vm));
+            Value_Print(stderr, VM_Pop(vm));
             puts("");
             return INTERPRET_OK;
         }
@@ -141,13 +178,39 @@ do{\
 }
 
 
-
 static void stack_reset(VM_t* vm)
 {
     vm->sp = &vm->stack[0];
 }
 
 
+static Value_t peek(const VM_t* vm, int offset)
+{
+    return vm->sp[-1 - offset];
+}
+
+
+
+static bool is_falsey(const Value_t val)
+{
+    return IS_NIL(val) || (IS_BOOL(val) && !AS_BOOL(val));
+}
+
+
+
+static void runtime_error(VM_t* vm, const char* fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    vfprintf(stderr, fmt, args);
+    va_end(args);
+    fputc('\n', stderr);
+
+    size_t ins_addr = vm->ip - vm->chunk->code - 1;
+    int line = LineInfo_GetLine(vm->chunk->line_info, ins_addr);
+    fprintf(stderr, "[line %d] in script\n", line);
+    stack_reset(vm);
+}
 
 
 

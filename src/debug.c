@@ -62,10 +62,18 @@ size_t Disasm_Instruction(FILE* fout, const Chunk_t* chunk, size_t offset)
 	case OP_CONSTANT:
 		offset = constInstruction(fout, "OP_CONSTANT", chunk, offset, 1);
 		break;
+	case OP_CONSTANT_LONG:
+		offset = constInstruction(fout, "OP_CNST_LONG", chunk, offset, 3);
+		break;
 
 	case OP_NEGATE:
 		offset = singleByte(fout, "OP_NEGATE", offset);
 		break;
+	case OP_NOT:
+		offset = singleByte(fout, "OP_NOT", offset);
+		break;
+
+
 	case OP_ADD:
 		offset = singleByte(fout, "OP_ADD", offset);
 		break;
@@ -80,15 +88,34 @@ size_t Disasm_Instruction(FILE* fout, const Chunk_t* chunk, size_t offset)
 		break;
 
 
+	case OP_EQUAL:
+		offset = singleByte(fout, "OP_EQUAL", offset);
+		break;
+	case OP_LESS:
+		offset = singleByte(fout, "OP_LESS", offset);
+		break;
+	case OP_GREATER:
+		offset = singleByte(fout, "OP_GREATER", offset);
+		break;
+
+
+	case OP_TRUE:
+		offset = singleByte(fout, "OP_TRUE", offset);
+		break;
+	case OP_FALSE:
+		offset = singleByte(fout, "OP_FALSE", offset);
+		break;
+	case OP_NIL:
+		offset = singleByte(fout, "OP_NIL", offset);
+		break;
+
+
 
 	default:
 		fprintf(fout, "Unknown opcode %d", ins);
 		offset += 1;
 		break;
 
-	case OP_CONSTANT_LONG:
-		offset = constInstruction(fout, "OP_CNST_LONG", chunk, offset, 3);
-		break;
 	}
 	putc('\n', fout);
 	return offset;
@@ -117,7 +144,7 @@ static size_t constInstruction(FILE* fout,
 	}
 
 	fprintf(fout, "%-16s %4zu ", mnemonic, const_addr);
-	printVal(fout, chunk->consts.vals[const_addr]);
+	Value_Print(fout, chunk->consts.vals[const_addr]);
 	return offset + 1 + addr_size;
 }
 
