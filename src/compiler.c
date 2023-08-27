@@ -8,6 +8,7 @@
 #include "include/chunk.h"
 #include "include/compiler.h"
 #include "include/debug.h"
+#include "include/object.h"
 
 
 typedef struct Parser_t
@@ -41,6 +42,7 @@ typedef struct Compiler_t
     Scanner_t scanner;
     Parser_t parser;
     Chunk_t* chunk;
+    Obj_t** head;
 } Compiler_t;
 
 
@@ -60,7 +62,7 @@ typedef struct ParseRule_t
 
 
 
-static void compiler_init(Compiler_t* compiler, const char* src, Chunk_t* chunk);
+static void compiler_init(Compiler_t* compiler, Obj_t** head, const char* src, Chunk_t* chunk);
 static void compiler_end(Compiler_t* compiler);
 
 
@@ -74,6 +76,7 @@ static const ParseRule_t* get_parse_rule(TokenType_t operator);
 static void expression(Compiler_t* compiler);
 
 
+static void string(Compiler_t* copmiler);
 static void literal(Compiler_t* compiler);
 static void number(Compiler_t* compiler);
 static void grouping(Compiler_t* compiler);
@@ -157,7 +160,7 @@ static const ParseRule_t s_rules[] =
   [TOKEN_LESS]          = {NULL,     binary, PREC_COMPARISON},
   [TOKEN_LESS_EQUAL]    = {NULL,     binary, PREC_COMPARISON},
   [TOKEN_IDENTIFIER]    = {NULL,     NULL,   PREC_NONE},
-  [TOKEN_STRING]        = {NULL,     NULL,   PREC_NONE},
+  [TOKEN_STRING]        = {string,   NULL,   PREC_NONE},
   [TOKEN_NUMBER]        = {number,   NULL,   PREC_NONE},
   [TOKEN_AND]           = {NULL,     NULL,   PREC_NONE},
   [TOKEN_CLASS]         = {NULL,     NULL,   PREC_NONE},
@@ -198,10 +201,10 @@ static const ParseRule_t s_rules[] =
 
 
 
-bool Compile(const char* src, Chunk_t* chunk)
+bool Compile(Obj_t** head, const char* src, Chunk_t* chunk)
 {
     Compiler_t compiler;
-    compiler_init(&compiler, src, chunk);
+    compiler_init(&compiler, head, src, chunk);
 
 
     advance(&compiler);
@@ -229,12 +232,13 @@ bool Compile(const char* src, Chunk_t* chunk)
 
 
 
-static void compiler_init(Compiler_t* compiler, const char* src, Chunk_t* chunk)
+static void compiler_init(Compiler_t* compiler, Obj_t** head, const char* src, Chunk_t* chunk)
 {
     Scanner_Init(&compiler->scanner, src);
     compiler->parser.had_error = false;
     compiler->parser.panic_mode = false;
     compiler->chunk = chunk;
+    compiler->head = head;
 }
 
 
@@ -316,6 +320,17 @@ static void expression(Compiler_t* compiler)
 
 
 
+
+
+
+
+static void string(Compiler_t* compiler)
+{
+    emit_constant(compiler, 
+        OBJ_VAL(ObjStr_Copy(compiler->head, compiler->chunk->alloc, 
+            compiler->parser.prev.start + 1, compiler->parser.prev.len - 2))
+    );
+}
 
 
 static void literal(Compiler_t* compiler)

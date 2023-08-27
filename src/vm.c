@@ -2,11 +2,14 @@
 
 #include <stdio.h>
 #include <stdarg.h>
+#include <string.h>
 
 #include "include/common.h"
 #include "include/vm.h"
 #include "include/compiler.h"
 #include "include/debug.h"
+#include "include/object.h"
+#include "include/memory.h"
 
 
 
@@ -15,6 +18,7 @@ static InterpretResult_t run(VM_t* vm);
 static void stack_reset(VM_t* vm);
 static Value_t peek(const VM_t* vm, int offset);
 static bool is_falsey(const Value_t val);
+static void str_concatenate(VM_t* vm);
 
 static void runtime_error(VM_t* vm, const char* fmt, ...);
 
@@ -24,6 +28,7 @@ static void runtime_error(VM_t* vm, const char* fmt, ...);
 void VM_Init(VM_t* vm)
 {
     vm->chunk = NULL;
+    vm->head = NULL;
     stack_reset(vm);
 }
 
@@ -58,7 +63,7 @@ InterpretResult_t VM_Interpret(VM_t* vm, Allocator_t* alloc, const char* src)
     Chunk_t chunk;
     Chunk_Init(&chunk, alloc, 1);
 
-    if (!Compile(src, &chunk))
+    if (!Compile(&vm->head, src, &chunk))
     {
         Chunk_Free(&chunk);
         return INTERPRET_COMPILE_ERROR;
@@ -71,6 +76,20 @@ InterpretResult_t VM_Interpret(VM_t* vm, Allocator_t* alloc, const char* src)
     Chunk_Free(&chunk);
     return ret;
 }
+
+
+void VM_FreeObjs(VM_t* vm)
+{
+    Obj_t* node = vm->head;
+    while (NULL != node)
+    {
+        Obj_t* next = node->next;
+        Obj_Free(vm->chunk->alloc, node);
+        node = next;
+    }
+}
+
+
 
 
 
@@ -140,7 +159,23 @@ do{\
             break;
 
 
-		case OP_ADD:        BINARY_OP(NUMBER_VAL, + ); break;
+        case OP_ADD:
+            if (IS_STRING(peek(vm, 0)) && IS_STRING(peek(vm, 1)))
+            {
+                str_concatenate(vm);
+            }
+            else if (IS_NUMBER(peek(vm, 0)) && IS_NUMBER(peek(vm, 1)))
+            {
+                double b = AS_NUMBER(VM_Pop(vm));
+                double a = AS_NUMBER(VM_Pop(vm));
+                VM_Push(vm, NUMBER_VAL(a + b));
+            }
+            else
+            {
+                runtime_error(vm, "Operands must be numbers or strings.");
+                return INTERPRET_RUNTIME_ERROR;
+            }
+            break;
         case OP_SUBTRACT:   BINARY_OP(NUMBER_VAL, - ); break;
         case OP_MULTIPLY:   BINARY_OP(NUMBER_VAL, * ); break;
         case OP_DIVIDE:     BINARY_OP(NUMBER_VAL, / ); break;
@@ -195,6 +230,28 @@ static bool is_falsey(const Value_t val)
 {
     return IS_NIL(val) || (IS_BOOL(val) && !AS_BOOL(val));
 }
+
+
+
+static void str_concatenate(VM_t* vm)
+{
+    ObjString_t* str_b = AS_STR(VM_Pop(vm));
+    ObjString_t* str_a = AS_STR(VM_Pop(vm));
+
+    int len = str_b->len + str_a->len;
+    char* buf = ALLOCATE(vm->chunk->alloc, char, len + 1);
+    memcpy(buf, str_a->cstr, str_a->len);
+    memcpy(buf + str_a->len, str_b->cstr, str_b->len);
+
+    buf[len] = '\0';
+    ObjString_t* result = ObjStr_Steal(&vm->head, vm->chunk->alloc, buf, len);
+    VM_Push(vm, OBJ_VAL(result));
+}
+
+
+
+
+
 
 
 

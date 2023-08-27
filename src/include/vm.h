@@ -17,6 +17,7 @@ typedef struct VM_t
     uint8_t* ip;
     Value_t stack[VM_STACK_MAX];
     Value_t* sp;
+    Obj_t* head;
 } VM_t;
 
 typedef enum InterpretResult_t
@@ -34,6 +35,7 @@ void VM_Push(VM_t* vm, Value_t val);
 Value_t VM_Pop(VM_t* vm);
 
 InterpretResult_t VM_Interpret(VM_t* vm, Allocator_t* alloc, const char* src);
+
 
 
 #endif /* _CLOX_VM_H_ */

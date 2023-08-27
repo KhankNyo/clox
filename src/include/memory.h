@@ -3,21 +3,16 @@
 
 #include "common.h"
 
-typedef struct FreeHeader_t FreeHeader_t;
-typedef size_t bufsize_t;	/* affects the header's size, is configurable */
-typedef struct Allocator_t
-{
-	uint8_t* head;
-	bufsize_t capacity;
-	bufsize_t used_size;
-
-	FreeHeader_t* free_head;
-} Allocator_t;
-
 
 
 
 /* CLox macros */
+
+#define ALLOCATE(p_allocator, type, nbytes)\
+	Allocator_Reallocate(p_allocator, NULL, 0, sizeof(type) * nbytes)
+
+#define FREE(p_allocator, type, ptr)\
+	Allocator_Reallocate(p_allocator, ptr, sizeof(type), 0)
 
 #define GROW_CAPACITY(cap)\
 	((cap) < 8 ? 8 : (cap) * 2)
@@ -31,6 +26,24 @@ typedef struct Allocator_t
 
 
 
+
+
+
+
+
+typedef struct FreeHeader_t FreeHeader_t;
+#ifndef bufsize_t
+	typedef size_t bufsize_t;	/* affects the header's size, is configurable */
+#endif /* bufsize_t */
+
+typedef struct Allocator_t
+{
+	uint8_t* head;
+	bufsize_t capacity;
+	bufsize_t used_size;
+
+	FreeHeader_t* free_head;
+} Allocator_t;
 
 /* 
  *   \param 1: allocator: the allocator struct

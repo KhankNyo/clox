@@ -6,7 +6,8 @@
 #include "common.h"
 #include "chunk.h"
 
-bool Compile(const char* src, Chunk_t* chunk);
+
+bool Compile(Obj_t** head, const char* src, Chunk_t* chunk);
 
 
 

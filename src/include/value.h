@@ -5,12 +5,20 @@
 #include "common.h"
 #include "memory.h"
 
+
+
+typedef struct Obj_t Obj_t;
+typedef struct ObjString_t ObjString_t;
+
+
 typedef enum ValType_t
 {
 	VAL_NIL,
 	VAL_BOOL,
 	VAL_NUMBER,
+	VAL_OBJ,
 } ValType_t;
+
 
 typedef struct Value_t
 {
@@ -18,6 +26,7 @@ typedef struct Value_t
 	union {
 		bool boolean;
 		double number;
+		Obj_t* obj;
 	} as;
 } Value_t;
 
@@ -31,16 +40,19 @@ typedef struct
 
 
 
-#define BOOL_VAL(val)	((Value_t){.type = VAL_BOOL,	.as.boolean = val,})
-#define NIL_VAL()		((Value_t){.type = VAL_NIL,		.as.number = 0,})
-#define NUMBER_VAL(val) ((Value_t){.type = VAL_NUMBER,	.as.number = val,})
+#define BOOL_VAL(val)		((Value_t){.type = VAL_BOOL,	.as.boolean = val,})
+#define NIL_VAL()			((Value_t){.type = VAL_NIL,		.as.number = 0,})
+#define NUMBER_VAL(val)		((Value_t){.type = VAL_NUMBER,	.as.number = val,})
+#define OBJ_VAL(val)		((Value_t){.type = VAL_OBJ,		.as.obj = (Obj_t*)(val),})
 
 #define AS_BOOL(value)		((value).as.boolean)
 #define AS_NUMBER(value)	((value).as.number)
+#define AS_OBJ(value)		((value).as.obj)
 
 #define IS_BOOL(value)		((value).type == VAL_BOOL)
 #define IS_NIL(value)		((value).type == VAL_NIL)
 #define IS_NUMBER(value)	((value).type == VAL_NUMBER)
+#define IS_OBJ(value)		((value).type == VAL_OBJ)
 
 
 void ValArr_Init(ValueArr_t* valarr, Allocator_t* alloc);
