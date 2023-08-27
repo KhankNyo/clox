@@ -25,18 +25,21 @@ static void runtime_error(VM_t* vm, const char* fmt, ...);
 
 
 
-void VM_Init(VM_t* vm)
+void VM_Init(VM_t* vm, Allocator_t* alloc)
 {
     vm->chunk = NULL;
-    vm->head = NULL;
+    vm->data.head = NULL;
+    vm->data.alloc = alloc;
     stack_reset(vm);
+    Table_Init(&vm->data.strings, alloc);
 }
 
 
 
 void VM_Free(VM_t* vm)
 {
-    VM_Init(vm);
+    Table_Free(&vm->data.strings);
+    VM_Init(vm, vm->data.alloc);
 }
 
 
@@ -63,7 +66,7 @@ InterpretResult_t VM_Interpret(VM_t* vm, Allocator_t* alloc, const char* src)
     Chunk_t chunk;
     Chunk_Init(&chunk, alloc, 1);
 
-    if (!Compile(&vm->head, src, &chunk))
+    if (!Compile(&vm->data, src, &chunk))
     {
         Chunk_Free(&chunk);
         return INTERPRET_COMPILE_ERROR;
@@ -80,7 +83,7 @@ InterpretResult_t VM_Interpret(VM_t* vm, Allocator_t* alloc, const char* src)
 
 void VM_FreeObjs(VM_t* vm)
 {
-    Obj_t* node = vm->head;
+    Obj_t* node = vm->data.head;
     while (NULL != node)
     {
         Obj_t* next = node->next;
@@ -242,17 +245,24 @@ static void str_concatenate(VM_t* vm)
     char* buf = NULL;
     
 #ifdef OBJSTR_FLEXIBLE_ARR
-    result = ObjStr_Reserve(&vm->head, vm->chunk->alloc, len);
+    result = ObjStr_Reserve(&vm->data, len);
     buf = result->cstr;
-#else
-    buf = ALLOCATE(vm->chunk->alloc, char, len + 1);
-    result = ObjStr_Steal(&vm->head, vm->chunk->alloc, buf, len);
-#endif /* OBJSTR_FLEXIBLE_ARR */
-
 
     memcpy(buf, str_a->cstr, str_a->len);
     memcpy(buf + str_a->len, str_b->cstr, str_b->len);
     buf[len] = '\0';
+
+    ObjStr_Intern(&vm->data, &result);
+#else
+    buf = ALLOCATE(vm->chunk->alloc, char, len + 1);
+    
+    memcpy(buf, str_a->cstr, str_a->len);
+    memcpy(buf + str_a->len, str_b->cstr, str_b->len);
+    buf[len] = '\0';
+    
+    result = ObjStr_Steal(&vm->data, buf, len);
+#endif /* OBJSTR_FLEXIBLE_ARR */
+
     VM_Push(vm, OBJ_VAL(result));
 }
 

@@ -6,10 +6,17 @@
 #include "chunk.h"
 #include "value.h"
 #include "memory.h"
-
+#include "table.h"
 
 #define VM_STACK_MAX 256
 
+
+struct VMData_t
+{
+    Allocator_t* alloc;
+    Table_t strings;
+    Obj_t* head;
+};
 
 typedef struct VM_t
 {
@@ -17,7 +24,8 @@ typedef struct VM_t
     uint8_t* ip;
     Value_t stack[VM_STACK_MAX];
     Value_t* sp;
-    Obj_t* head;
+
+    VMData_t data;
 } VM_t;
 
 typedef enum InterpretResult_t
@@ -28,7 +36,7 @@ typedef enum InterpretResult_t
 } InterpretResult_t;
 
 
-void VM_Init(VM_t* vm);
+void VM_Init(VM_t* vm, Allocator_t* alloc);
 void VM_Free(VM_t* vm);
 
 void VM_Push(VM_t* vm, Value_t val);

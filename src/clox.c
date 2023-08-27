@@ -19,7 +19,7 @@ static void unload_file_content(Allocator_t* alloc, char* file_content);
 void Clox_Init(Clox_t *clox, size_t allocator_capacity)
 {
     Allocator_Init(&clox->alloc, allocator_capacity);
-    VM_Init(&clox->vm);
+    VM_Init(&clox->vm, &clox->alloc);
     clox->err = CLOX_NOERR;
 }
 

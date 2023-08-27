@@ -70,14 +70,7 @@ bool Value_Equal(Value_t a, Value_t b)
 	case VAL_NUMBER:	
 		return (AS_NUMBER(a) - FLT_EPSILON <= AS_NUMBER(b))
 			&& (AS_NUMBER(b) <= AS_NUMBER(a) + FLT_EPSILON);
-	case VAL_OBJ:
-	{
-		const ObjString_t* str_a = AS_STR(a);
-		const ObjString_t* str_b = AS_STR(b);
-		return (str_a->len == str_b->len)
-			&& (memcmp(str_a->cstr, str_b->cstr, str_a->len) == 0);
-	}
-	break;
+	case VAL_OBJ:       return AS_OBJ(a) == AS_OBJ(b);
 	default: CLOX_ASSERT(false && "Unhandled Value_Equal() case"); return false;
 	}
 }

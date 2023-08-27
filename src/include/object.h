@@ -4,6 +4,7 @@
 
 #include "common.h"
 #include "value.h"
+#include "typedefs.h"
 
 
 
@@ -25,13 +26,11 @@ struct Obj_t
 };
 
 
-
-
-
 struct ObjString_t
 {
     Obj_t obj;
     int len;
+    uint32_t hash;
 #ifdef OBJSTR_FLEXIBLE_ARR
     char cstr[];
 #else
@@ -45,11 +44,12 @@ struct ObjString_t
 void Obj_Free(Allocator_t* alloc, Obj_t* obj);
 
 
-ObjString_t* ObjStr_Copy(Obj_t** head, Allocator_t* alloc, const char* cstr, int len);
+ObjString_t* ObjStr_Copy(VMData_t* vmdata, const char* cstr, int len);
 #ifdef OBJSTR_FLEXIBLE_ARR
-ObjString_t* ObjStr_Reserve(Obj_t** head, Allocator_t* alloc, int len);
+    ObjString_t* ObjStr_Reserve(VMData_t* vmdata, int len);
+    bool ObjStr_Intern(VMData_t* vmdata, ObjString_t* string);
 #else
-ObjString_t* ObjStr_Steal(Obj_t** head, Allocator_t* alloc, char* heapstr, int len);
+    ObjString_t* ObjStr_Steal(VMData_t* vmdata, char* heapstr, int len);
 #endif /* OBJSTR_FLEXIBLE_ARR */
 
 void Obj_Print(const Value_t val);

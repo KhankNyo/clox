@@ -42,7 +42,7 @@ typedef struct Compiler_t
     Scanner_t scanner;
     Parser_t parser;
     Chunk_t* chunk;
-    Obj_t** head;
+    VMData_t* vmdata;
 } Compiler_t;
 
 
@@ -62,7 +62,7 @@ typedef struct ParseRule_t
 
 
 
-static void compiler_init(Compiler_t* compiler, Obj_t** head, const char* src, Chunk_t* chunk);
+static void compiler_init(Compiler_t* compiler, VMData_t* data, const char* src, Chunk_t* chunk);
 static void compiler_end(Compiler_t* compiler);
 
 
@@ -201,10 +201,10 @@ static const ParseRule_t s_rules[] =
 
 
 
-bool Compile(Obj_t** head, const char* src, Chunk_t* chunk)
+bool Compile(VMData_t* data, const char* src, Chunk_t* chunk)
 {
     Compiler_t compiler;
-    compiler_init(&compiler, head, src, chunk);
+    compiler_init(&compiler, data, src, chunk);
 
 
     advance(&compiler);
@@ -232,13 +232,13 @@ bool Compile(Obj_t** head, const char* src, Chunk_t* chunk)
 
 
 
-static void compiler_init(Compiler_t* compiler, Obj_t** head, const char* src, Chunk_t* chunk)
+static void compiler_init(Compiler_t* compiler, VMData_t* data, const char* src, Chunk_t* chunk)
 {
     Scanner_Init(&compiler->scanner, src);
     compiler->parser.had_error = false;
     compiler->parser.panic_mode = false;
     compiler->chunk = chunk;
-    compiler->head = head;
+    compiler->vmdata = data;
 }
 
 
@@ -327,7 +327,7 @@ static void expression(Compiler_t* compiler)
 static void string(Compiler_t* compiler)
 {
     emit_constant(compiler, 
-        OBJ_VAL(ObjStr_Copy(compiler->head, compiler->chunk->alloc, 
+        OBJ_VAL(ObjStr_Copy(compiler->vmdata, 
             compiler->parser.prev.start + 1, compiler->parser.prev.len - 2))
     );
 }

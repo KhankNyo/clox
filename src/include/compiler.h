@@ -5,10 +5,12 @@
 
 #include "common.h"
 #include "chunk.h"
+#include "typedefs.h"
 
 
-bool Compile(Obj_t** head, const char* src, Chunk_t* chunk);
+bool Compile(VMData_t* data, const char* src, Chunk_t* chunk);
 
 
 
 #endif /* _CLOX_COMPILER_H_ */
+

@@ -12,16 +12,16 @@
 
 
 
-#define ALLOCATE_OBJ(pp_head, p_allocator, type, objType)\
-    (type *)allocate_obj(pp_head, p_allocator, sizeof(type), objType)
+#define ALLOCATE_OBJ(p_vmdata, type, objType)\
+    (type *)allocate_obj(p_vmdata, sizeof(type), objType)
 
 
 #ifndef OBJSTR_FLEXIBLE_ARR
-static ObjString_t* allocate_string(Obj_t** head, Allocator_t* alloc, char* cstr, int len);
+static ObjString_t* allocate_string(VMData_t* vmdata, char* cstr, int len, uint32_t hash);
 #endif /* OBJSTR_FLEXIBLE_ARR */
 
-static Obj_t* allocate_obj(Obj_t** head, Allocator_t* alloc, size_t nbytes, ObjType_t type);
-
+static Obj_t* allocate_obj(VMData_t* vmdata, size_t nbytes, ObjType_t type);
+static uint32_t hash_str(const char* str, int len);
 
 
 
@@ -61,23 +61,33 @@ void Obj_Free(Allocator_t* alloc, Obj_t* obj)
 
 
 
-ObjString_t* ObjStr_Copy(Obj_t** head, Allocator_t* alloc, const char* cstr, int len)
+ObjString_t* ObjStr_Copy(VMData_t* vmdata, const char* cstr, int len)
 {
-    ObjString_t* string = NULL;
+    uint32_t hash = hash_str(cstr, len);
+    ObjString_t* string = Table_FindStr(&vmdata->strings, cstr, len, hash);
+    if (NULL != string)
+    {
+        return string;
+    }
     char* buf = NULL;
 
 
 #ifdef OBJSTR_FLEXIBLE_ARR
-    string = ObjStr_Reserve(head, alloc, len);
+    string = ObjStr_Reserve(vmdata, len);
     buf = string->cstr;
-#else
-    buf = ALLOCATE(alloc, char, len + 1);
-    string = allocate_string(head, alloc, buf, len);
-#endif /* OBJSTR_FLEXIBLE_ARR */
-
-
+    
     memcpy(buf, cstr, len);
     buf[len] = '\0';
+  
+    ObjStr_Intern(vmdata, string);
+#else
+    buf = ALLOCATE(vmdata->alloc, char, len + 1);
+    string = allocate_string(vmdata, buf, len, hash);
+    
+    memcpy(buf, cstr, len);
+    buf[len] = '\0';
+#endif /* OBJSTR_FLEXIBLE_ARR */
+
     return string;
 }
 
@@ -86,18 +96,35 @@ ObjString_t* ObjStr_Copy(Obj_t** head, Allocator_t* alloc, const char* cstr, int
 
 #ifdef OBJSTR_FLEXIBLE_ARR
 
-ObjString_t* ObjStr_Reserve(Obj_t** head, Allocator_t* alloc, int len)
+ObjString_t* ObjStr_Reserve(VMData_t* vmdata, int len)
 {
-    ObjString_t* string = (ObjString_t*)allocate_obj(head, alloc, sizeof(*string) + len + 1, OBJ_STRING);
+    ObjString_t* string = (ObjString_t*)allocate_obj(
+            vmdata, sizeof(*string) + len + 1, OBJ_STRING
+    );
     string->len = len;
     return string;
 }
 
+bool ObjStr_Intern(VMData_t* vmdata, ObjString_t* string)
+{
+    string->hash = hash_str(string->cstr, string->len);
+    return Table_Set(&vmdata->strings, string, NIL_VAL());
+}
+
+
 #else
 
-ObjString_t* ObjStr_Steal(Obj_t** head, Allocator_t* alloc, char* heapstr, int len)
+ObjString_t* ObjStr_Steal(VMData_t* vmdata, char* heapstr, int len)
 {
-    return allocate_string(head, alloc, heapstr, len);
+    uint32_t hash = hash_str(heapstr, len);
+    ObjString_t* interned = Table_FindStr(&vmdata->strings, heapstr, len, hash);
+    if (NULL != interned)
+    {
+        FREE_ARRAY(vmdata->alloc, *heapstr, heapstr, len + 1);
+        return interned;
+    }
+
+    return allocate_string(vmdata, heapstr, len, hash);
 }
 
 
@@ -127,25 +154,43 @@ void Obj_Print(const Value_t val)
 
 #if !defined(OBJSTR_FLEXIBLE_ARR)
 
-static ObjString_t* allocate_string(Obj_t** head, Allocator_t* alloc, char* cstr, int len)
+static ObjString_t* allocate_string(VMData_t* vmdata, char* cstr, int len, uint32_t hash)
 {
-    ObjString_t* string = ALLOCATE_OBJ(head, alloc, ObjString_t, OBJ_STRING);
+    ObjString_t* string = ALLOCATE_OBJ(vmdata, ObjString_t, OBJ_STRING);
     string->cstr = cstr;
     string->len = len;
+    string->hash = hash;
+
+    Table_Set(&vmdata->strings, string, NIL_VAL());
     return string;
 }
 
 #endif /* OBJSTR_FLEXIBLE_ARR */
 
 
-static Obj_t* allocate_obj(Obj_t** head, Allocator_t* alloc, size_t nbytes, ObjType_t type)
+static Obj_t* allocate_obj(VMData_t* vmdata, size_t nbytes, ObjType_t type)
 {
-    Obj_t* obj = Allocator_Alloc(alloc, nbytes);
+    Obj_t* obj = Allocator_Alloc(vmdata->alloc, nbytes);
     obj->type = type;
 
-    obj->next = *head;
-    *head = obj;
+    obj->next = vmdata->head;
+    vmdata->head = obj;
     
     return obj;
 }
+
+
+/* FNV-1a hashing */
+static uint32_t hash_str(const char* str, int len)
+{
+    uint32_t hash = 2166136261u;
+    for (int i = 0; i < len; i++)
+    {
+        hash ^= (uint8_t)str[i];
+        hash *= 16777619;
+    }
+    return hash;
+}
+
+
 
