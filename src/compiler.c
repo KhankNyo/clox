@@ -482,17 +482,12 @@ static void advance(Compiler_t* compiler)
     Parser_t* parser = &compiler->parser; /* ease typing */
     parser->prev = parser->curr;
 
-    while (true)
-    {
+
+    do {
         parser->curr = Scanner_ScanToken(&compiler->scanner);
-
-        if (parser->curr.type != TOKEN_ERROR)
-            break;
-
         error_at_current(parser, parser->curr.start);
-    }
+    } while (TOKEN_ERROR == parser->curr.type);
 }
-
 
 
 static void consume(Compiler_t* compiler, TokenType_t expected_type, const char* errmsg)
