@@ -33,8 +33,11 @@ bool Table_Get(Table_t* table, const ObjString_t* key, Value_t* val);
 bool Table_Set(Table_t* table, ObjString_t* key, Value_t val);
 bool Table_Delete(Table_t* table, const ObjString_t* key);
 void Table_AddAll(const Table_t* src, Table_t* dst);
-ObjString_t* Table_FindStr(Table_t* strings, const char* cstr, int len, uint32_t hash);
-
+ObjString_t* Table_FindStr(Table_t* table, const char* cstr, int len, uint32_t hash);
+ObjString_t* Table_FindStrs(Table_t* table, 
+        int substr_count, const ObjString_t* substr[static substr_count], 
+        uint32_t hash, int total_len
+);
 
 
 #endif /* _CLOX_TABLE_H_ */

@@ -45,6 +45,8 @@ void Obj_Free(Allocator_t* alloc, Obj_t* obj);
 
 
 ObjString_t* ObjStr_Copy(VMData_t* vmdata, const char* cstr, int len);
+uint32_t ObjStr_HashStrs(int count, const ObjString_t* strings[static count]);
+
 #ifdef OBJSTR_FLEXIBLE_ARR
     ObjString_t* ObjStr_Reserve(VMData_t* vmdata, int len);
     bool ObjStr_Intern(VMData_t* vmdata, ObjString_t* string);

@@ -140,6 +140,50 @@ ObjString_t* Table_FindStr(Table_t* table, const char* cstr, int len, uint32_t h
 
 
 
+ObjString_t* Table_FindStrs(Table_t* table, 
+        int substr_count, const ObjString_t* substr[static substr_count], 
+        uint32_t hash, int total_len)
+{
+    if (table->count == 0)
+    {
+        return NULL;
+    }
+
+    uint32_t index = hash % table->capacity;
+    while (true)
+    {
+        Entry_t* entry = &table->entries[index];
+        if (entry->key == NULL)
+        {
+            if (IS_NIL(entry->val)) /* stops if encountered an empty slot */
+                return NULL;
+        }
+        else if (entry->key->len == total_len) /* the key and substrs have the same len */
+        {
+            const char* key_substr = entry->key->cstr;
+            for (int i = 0; i < substr_count; i++)
+            {
+                if (memcmp(key_substr, substr[i]->cstr, substr[i]->len) != 0)
+                {   /* substr not equal */
+                    goto find_next;
+                }
+                key_substr += substr[i]->len;
+            
+            }
+            return entry->key;
+        }
+find_next:
+
+
+        index += 1;
+        if (index >= table->capacity)
+            index = 0;
+    }
+
+}
+
+
+
 static void adjust_capacity(Table_t* table, size_t newcap)
 {
     Entry_t* new_entries = ALLOCATE(table->alloc, Entry_t, newcap);

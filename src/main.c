@@ -26,7 +26,6 @@ int main(int argc, char** argv)
 		exit(CLOX_UNIX_ENONET);	/* unix exit code for invalid usage */
 	}
 
-
 	if (clox.err != CLOX_NOERR)
 		exit(clox.err);
 	Clox_Free(&clox);

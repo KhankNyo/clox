@@ -245,14 +245,21 @@ static void str_concatenate(VM_t* vm)
     char* buf = NULL;
     
 #ifdef OBJSTR_FLEXIBLE_ARR
-    result = ObjStr_Reserve(&vm->data, len);
-    buf = result->cstr;
+    const ObjString_t* strs[] = {str_a, str_b};
 
-    memcpy(buf, str_a->cstr, str_a->len);
-    memcpy(buf + str_a->len, str_b->cstr, str_b->len);
-    buf[len] = '\0';
+    uint32_t hash = ObjStr_HashStrs(2, strs); 
+    result = Table_FindStrs(&vm->data.strings, 2, strs, hash, len);
+    if (NULL == result)
+    {
+        result = ObjStr_Reserve(&vm->data, len);
+        buf = result->cstr;
 
-    ObjStr_Intern(&vm->data, &result);
+        memcpy(buf, str_a->cstr, str_a->len);
+        memcpy(buf + str_a->len, str_b->cstr, str_b->len);
+        buf[len] = '\0';
+
+        ObjStr_Intern(&vm->data, result);
+    }
 #else
     buf = ALLOCATE(vm->chunk->alloc, char, len + 1);
     

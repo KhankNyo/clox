@@ -15,6 +15,7 @@
 #define ALLOCATE_OBJ(p_vmdata, type, objType)\
     (type *)allocate_obj(p_vmdata, sizeof(type), objType)
 
+#define HASH_BYTE(prev_hash, ch) (((prev_hash) ^ (uint8_t)(ch)) * 16777619)
 
 #ifndef OBJSTR_FLEXIBLE_ARR
 static ObjString_t* allocate_string(VMData_t* vmdata, char* cstr, int len, uint32_t hash);
@@ -22,7 +23,6 @@ static ObjString_t* allocate_string(VMData_t* vmdata, char* cstr, int len, uint3
 
 static Obj_t* allocate_obj(VMData_t* vmdata, size_t nbytes, ObjType_t type);
 static uint32_t hash_str(const char* str, int len);
-
 
 
 
@@ -90,6 +90,25 @@ ObjString_t* ObjStr_Copy(VMData_t* vmdata, const char* cstr, int len)
 
     return string;
 }
+
+
+uint32_t ObjStr_HashStrs(int count, const ObjString_t* strings[static count])
+{
+    uint32_t hash = 2166136261u;
+    for (int i = 0; i < count; i++)
+    {
+        for (int j = 0; j < strings[i]->len; j++)
+        {
+            hash = HASH_BYTE(hash, strings[i]->cstr[j]);
+        }
+    }
+    return hash;
+}
+
+
+
+
+
 
 
 
@@ -186,11 +205,11 @@ static uint32_t hash_str(const char* str, int len)
     uint32_t hash = 2166136261u;
     for (int i = 0; i < len; i++)
     {
-        hash ^= (uint8_t)str[i];
-        hash *= 16777619;
+        hash = HASH_BYTE(hash, str[i]);
     }
     return hash;
 }
+
 
 
 
