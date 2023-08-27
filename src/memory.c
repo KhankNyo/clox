@@ -12,8 +12,10 @@
 
 #if  defined(DEBUG)
 #  define BUFFER_ALLOCATION_CHK
-#  define MAGIC_FRONT_VALUE 0xdeadbeef
-#  define MAGIC_BACK_VALUE 0xbaadf00d
+#  define MAGIC_FRONT_ALLOC 0x0df00d90
+#  define MAGIC_BACK_ALLOC 0xefbe0d90
+#  define MAGIC_FRONT_FREE 0xefbeadde
+#  define MAGIC_BACK_FREE 0x0df0adba
 #endif /* DEBUG */
 
 
@@ -44,13 +46,13 @@ typedef struct Split_t
 static FreeHeader_t* get_free_node(Allocator_t* allocator, bufsize_t nbytes);
 static void insert_free_node(Allocator_t* allocator, FreeHeader_t* node);
 static Split_t split_free_buffer(bufsize_t new_node_capacity, uint8_t* bufstart, bufsize_t bufsize);
-static void set_header(FreeHeader_t* header, size_t capacity, FreeHeader_t* next);
+static void set_header(FreeHeader_t* header, size_t capacity, FreeHeader_t* next, bool is_freed);
 
 #define GET_HEADER(ptr) (FreeHeader_t*)(((uint8_t*)(ptr)) - sizeof(FreeHeader_t))
 #define GET_PTR(header_ptr) (((uint8_t*)(header_ptr)) + sizeof(FreeHeader_t))
 
-#define MIN_SIZE 8
-#define MIN_BUF_SIZE (MIN_SIZE + sizeof(FreeHeader_t))
+#define MIN_SIZE 16
+#define MIN_CAPACITY (MIN_SIZE + sizeof(FreeHeader_t))
 
 
 
@@ -137,15 +139,19 @@ void* Allocator_Reallocate(Allocator_t* alloc, void* ptr, bufsize_t oldsize, buf
 
 void Allocator_Free(Allocator_t* allocator, void* ptr)
 {
+	if (NULL == ptr)
+	{
+		return;
+	}
 #ifdef BUFFER_ALLOCATION_CHK
-	const FreeHeader_t* header = GET_HEADER(ptr);
-	if (header->_magic_front != MAGIC_FRONT_VALUE)
+	FreeHeader_t* header = GET_HEADER(ptr);
+	if (header->_magic_front != MAGIC_FRONT_ALLOC)
 	{
 		fprintf(stderr, "Header of buffer at location %p was overwritten with %x\n", ptr, header->_magic_front);
 		abort();
 	}
 	
-	if (header->_magic_back != MAGIC_BACK_VALUE)
+	if (header->_magic_back != MAGIC_BACK_ALLOC)
 	{
 		fprintf(stderr, "Back of header of buffer at location %p was overwritten with %x\n", ptr, header->_magic_back);
 		abort();
@@ -250,50 +256,69 @@ static void insert_free_node(Allocator_t* allocator, FreeHeader_t* node)
 	}
 	CLOX_ASSERT(curr != node && "double free");
 
-
+	set_header(node,      node->capacity, curr, true);
 	if (NULL == prev)
 	{
-		node->next = curr;
-		curr->next = NULL;
 		allocator->free_head = node;
 		return;
 	}
 	prev->next = node;
-	node->next = curr;
 }
 
 
 
 
 
-static Split_t split_free_buffer(bufsize_t new_node_capacity, uint8_t* bufstart, bufsize_t bufsize)
+static Split_t split_free_buffer(bufsize_t alloc_size, uint8_t* bufstart, bufsize_t bufsize)
 {
+	if (alloc_size < MIN_SIZE)
+	{
+		alloc_size = MIN_SIZE;
+	}
+	else if (alloc_size % MIN_SIZE)
+	{
+		alloc_size += MIN_SIZE - (alloc_size % MIN_SIZE);
+	}
+
+
+
 	Split_t split = { 0 };
+
+
 	/* if the whole buffer is not big enough, split is all NULL */
-	if (new_node_capacity + sizeof(FreeHeader_t) > bufsize)
+	const size_t new_node_capacity = alloc_size + sizeof(FreeHeader_t);
+	if (new_node_capacity > bufsize)
 		return split;
-
-
 	split.new_node = (FreeHeader_t*)bufstart;
-	set_header(split.new_node, new_node_capacity, NULL);
+	set_header(split.new_node, alloc_size, NULL, false);
 
 
 	/* if the other half is not big enough, new_free_node is NULL */
-	if (bufsize - new_node_capacity < MIN_BUF_SIZE)
-		return split;
-	
-	split.new_free_node = (FreeHeader_t*)&bufstart[new_node_capacity + sizeof(FreeHeader_t)];
-	set_header(split.new_free_node, bufsize - new_node_capacity - sizeof(FreeHeader_t), NULL);
+	const size_t new_free_capacity = bufsize - new_node_capacity;
+	if (new_free_capacity >= MIN_CAPACITY)
+	{
+		split.new_free_node = (FreeHeader_t*)&bufstart[new_node_capacity];
+		set_header(split.new_free_node, new_free_capacity - sizeof(FreeHeader_t), NULL, true);
+	}
 	return split;
 }
 
 
 
-static void set_header(FreeHeader_t* header, size_t capacity, FreeHeader_t* next)
+static void set_header(FreeHeader_t* header, size_t capacity, FreeHeader_t* next, bool is_freed)
 {
+	(void)is_freed;
 #ifdef BUFFER_ALLOCATION_CHK
-	header->_magic_back = MAGIC_BACK_VALUE;
-	header->_magic_front = MAGIC_FRONT_VALUE;
+	if (!is_freed)
+	{
+		header->_magic_back = MAGIC_BACK_ALLOC;
+		header->_magic_front = MAGIC_FRONT_ALLOC;
+	}
+	else
+	{
+		header->_magic_back = MAGIC_BACK_FREE;
+		header->_magic_front = MAGIC_FRONT_FREE;
+	}
 #endif /* BUFFER_ALLOCATION_CHK */
 
 	header->next = next;
