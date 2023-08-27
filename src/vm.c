@@ -38,6 +38,7 @@ void VM_Init(VM_t* vm, Allocator_t* alloc)
 
 void VM_Free(VM_t* vm)
 {
+    /* TODO: Table_Free does not actually free the strings itself */
     Table_Free(&vm->data.strings);
     VM_Init(vm, vm->data.alloc);
 }

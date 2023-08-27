@@ -58,7 +58,7 @@ bool Table_Get(Table_t* table, const ObjString_t* key, Value_t* val)
     {
         return false;
     }
-    
+
     Entry_t* entry = find_entry(table->entries, table->capacity, key);
     if (is_empty(entry) || is_tombstone(entry))
     {
@@ -123,9 +123,9 @@ ObjString_t* Table_FindStr(Table_t* table, const char* cstr, int len, uint32_t h
             if (IS_NIL(entry->val)) /* stops if encountered an empty slot */
                 return NULL;
         }
-        else if (entry->key->len == len
-            && (entry->key->hash == hash)
-            && (memcmp(entry->key->cstr, cstr, len) == 0))
+        else if ((entry->key->len == len)
+                && (entry->key->hash == hash)
+                && (memcmp(entry->key->cstr, cstr, len) == 0))
         {
             /* key found */
             return entry->key;
@@ -158,7 +158,7 @@ ObjString_t* Table_FindStrs(Table_t* table,
             if (IS_NIL(entry->val)) /* stops if encountered an empty slot */
                 return NULL;
         }
-        else if (entry->key->len == total_len) /* the key and substrs have the same len */
+        else if (entry->key->len == total_len && entry->key->hash == hash) 
         {
             const char* key_substr = entry->key->cstr;
             for (int i = 0; i < substr_count; i++)
@@ -168,7 +168,7 @@ ObjString_t* Table_FindStrs(Table_t* table,
                     goto find_next;
                 }
                 key_substr += substr[i]->len;
-            
+
             }
             return entry->key;
         }
@@ -181,6 +181,16 @@ find_next:
     }
 
 }
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -226,7 +236,6 @@ static Entry_t* find_entry(Entry_t* entries, size_t num_entries, const ObjString
     while (true)
     {
         Entry_t* entry = &entries[index];
-        /* uhmmm */
         if (entry->key == NULL)
         {
             if (IS_NIL(entry->val)) /* deleted */
@@ -243,9 +252,7 @@ static Entry_t* find_entry(Entry_t* entries, size_t num_entries, const ObjString
 
         index += 1;
         if (index >= num_entries)
-        {
             index = 0;
-        }
     }
 }
 

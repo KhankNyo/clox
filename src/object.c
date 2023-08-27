@@ -143,7 +143,9 @@ ObjString_t* ObjStr_Steal(VMData_t* vmdata, char* heapstr, int len)
         return interned;
     }
 
-    return allocate_string(vmdata, heapstr, len, hash);
+    ObjString_t* string = allocate_string(vmdata, heapstr, len, hash);
+    Table_Set(&vmdata->strings, string, NIL_VAL());
+    return string;
 }
 
 

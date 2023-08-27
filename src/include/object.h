@@ -40,20 +40,55 @@ struct ObjString_t
 
 
 
-
+/* 
+ *  Free the obj pointer and the underlying object iself
+ */
 void Obj_Free(Allocator_t* alloc, Obj_t* obj);
 
 
+
+/*
+ *  Creates a new ObjString_t object by copying the cstr given
+ *  \returns a pointer to the newly created ObjString_t object
+ */
 ObjString_t* ObjStr_Copy(VMData_t* vmdata, const char* cstr, int len);
+
+/*
+ *  \returns the hash of multiple strings, the given strings are treated as one
+ */
 uint32_t ObjStr_HashStrs(int count, const ObjString_t* strings[static count]);
 
+
 #ifdef OBJSTR_FLEXIBLE_ARR
+    /* 
+     *  Creates a new ObjString_t object and reserve len + 1 bytes of memory
+     *  \returns a pointer to the newly created ObjString_t object
+     */
     ObjString_t* ObjStr_Reserve(VMData_t* vmdata, int len);
+
+    /* 
+     *  Hashes the given string, and set it in the vmdata's string table if
+     *  the string did not exist before
+     *  \returns true if the string already exist in the string table
+     *  \returns false otherwise
+     */
     bool ObjStr_Intern(VMData_t* vmdata, ObjString_t* string);
 #else
+
+    /*
+     *  steals the pointer to the heapstr, 
+     *  if the heapstr already existed in vmdata's string table,
+     *      the heapstr is freed and the string in vmdata's string table is returned
+     *  else 
+     *      allocate a new ObjString_t object, set it in vmdata's string table and then return it
+     *  \returns the string in vmdata's string table if it already exist
+     *  \returns the newly allocated string otherwise 
+     */
     ObjString_t* ObjStr_Steal(VMData_t* vmdata, char* heapstr, int len);
 #endif /* OBJSTR_FLEXIBLE_ARR */
 
+
+/* prints a val to stdout */
 void Obj_Print(const Value_t val);
 
 
