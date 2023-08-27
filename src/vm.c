@@ -237,14 +237,22 @@ static void str_concatenate(VM_t* vm)
 {
     ObjString_t* str_b = AS_STR(VM_Pop(vm));
     ObjString_t* str_a = AS_STR(VM_Pop(vm));
-
+    ObjString_t* result = NULL;
     int len = str_b->len + str_a->len;
-    char* buf = ALLOCATE(vm->chunk->alloc, char, len + 1);
+    char* buf = NULL;
+    
+#ifdef OBJSTR_FLEXIBLE_ARR
+    result = ObjStr_Reserve(&vm->head, vm->chunk->alloc, len);
+    buf = result->cstr;
+#else
+    buf = ALLOCATE(vm->chunk->alloc, char, len + 1);
+    result = ObjStr_Steal(&vm->head, vm->chunk->alloc, buf, len);
+#endif /* OBJSTR_FLEXIBLE_ARR */
+
+
     memcpy(buf, str_a->cstr, str_a->len);
     memcpy(buf + str_a->len, str_b->cstr, str_b->len);
-
     buf[len] = '\0';
-    ObjString_t* result = ObjStr_Steal(&vm->head, vm->chunk->alloc, buf, len);
     VM_Push(vm, OBJ_VAL(result));
 }
 

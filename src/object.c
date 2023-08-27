@@ -16,7 +16,10 @@
     (type *)allocate_obj(pp_head, p_allocator, sizeof(type), objType)
 
 
+#ifndef OBJSTR_FLEXIBLE_ARR
 static ObjString_t* allocate_string(Obj_t** head, Allocator_t* alloc, char* cstr, int len);
+#endif /* OBJSTR_FLEXIBLE_ARR */
+
 static Obj_t* allocate_obj(Obj_t** head, Allocator_t* alloc, size_t nbytes, ObjType_t type);
 
 
@@ -42,7 +45,9 @@ void Obj_Free(Allocator_t* alloc, Obj_t* obj)
     case OBJ_STRING:
     {
         ObjString_t* str = (ObjString_t*)obj;
+#ifndef OBJSTR_FLEXIBLE_ARR
         FREE_ARRAY(alloc, *str->cstr, str->cstr, str->len + 1);
+#endif 
         FREE(alloc, *str, str);
     }
     break;
@@ -58,18 +63,45 @@ void Obj_Free(Allocator_t* alloc, Obj_t* obj)
 
 ObjString_t* ObjStr_Copy(Obj_t** head, Allocator_t* alloc, const char* cstr, int len)
 {
-    char* buf = ALLOCATE(alloc, char, len + 1);
+    ObjString_t* string = NULL;
+    char* buf = NULL;
+
+
+#ifdef OBJSTR_FLEXIBLE_ARR
+    string = ObjStr_Reserve(head, alloc, len);
+    buf = string->cstr;
+#else
+    buf = ALLOCATE(alloc, char, len + 1);
+    string = allocate_string(head, alloc, buf, len);
+#endif /* OBJSTR_FLEXIBLE_ARR */
+
 
     memcpy(buf, cstr, len);
     buf[len] = '\0';
-    return allocate_string(head, alloc, buf, len);
+    return string;
 }
 
+
+
+
+#ifdef OBJSTR_FLEXIBLE_ARR
+
+ObjString_t* ObjStr_Reserve(Obj_t** head, Allocator_t* alloc, int len)
+{
+    ObjString_t* string = (ObjString_t*)allocate_obj(head, alloc, sizeof(*string) + len + 1, OBJ_STRING);
+    string->len = len;
+    return string;
+}
+
+#else
 
 ObjString_t* ObjStr_Steal(Obj_t** head, Allocator_t* alloc, char* heapstr, int len)
 {
     return allocate_string(head, alloc, heapstr, len);
 }
+
+
+#endif /* OBJSTR_FLEXIBLE_ARR */
 
 
 void Obj_Print(const Value_t val)
@@ -93,6 +125,7 @@ void Obj_Print(const Value_t val)
 
 
 
+#if !defined(OBJSTR_FLEXIBLE_ARR)
 
 static ObjString_t* allocate_string(Obj_t** head, Allocator_t* alloc, char* cstr, int len)
 {
@@ -102,6 +135,7 @@ static ObjString_t* allocate_string(Obj_t** head, Allocator_t* alloc, char* cstr
     return string;
 }
 
+#endif /* OBJSTR_FLEXIBLE_ARR */
 
 
 static Obj_t* allocate_obj(Obj_t** head, Allocator_t* alloc, size_t nbytes, ObjType_t type)

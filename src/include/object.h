@@ -32,7 +32,11 @@ struct ObjString_t
 {
     Obj_t obj;
     int len;
+#ifdef OBJSTR_FLEXIBLE_ARR
+    char cstr[];
+#else
     char* cstr;
+#endif /* OBJSTR_FLEXIBLE_ARR */
 };
 
 
@@ -42,7 +46,12 @@ void Obj_Free(Allocator_t* alloc, Obj_t* obj);
 
 
 ObjString_t* ObjStr_Copy(Obj_t** head, Allocator_t* alloc, const char* cstr, int len);
+#ifdef OBJSTR_FLEXIBLE_ARR
+ObjString_t* ObjStr_Reserve(Obj_t** head, Allocator_t* alloc, int len);
+#else
 ObjString_t* ObjStr_Steal(Obj_t** head, Allocator_t* alloc, char* heapstr, int len);
+#endif /* OBJSTR_FLEXIBLE_ARR */
+
 void Obj_Print(const Value_t val);
 
 
