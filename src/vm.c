@@ -14,6 +14,7 @@
 
 
 
+
 static InterpretResult_t run(VM_t* vm);
 static void stack_reset(VM_t* vm);
 static Value_t peek(const VM_t* vm, int offset);
@@ -38,12 +39,21 @@ void VM_Init(VM_t* vm, Allocator_t* alloc)
 
 void VM_Free(VM_t* vm)
 {
-    /* TODO: Table_Free does not actually free the strings itself */
+    VM_FreeObjects(&vm->data);
     Table_Free(&vm->data.strings);
     VM_Init(vm, vm->data.alloc);
 }
 
-
+void VM_FreeObjects(VMData_t* data)
+{
+    Obj_t* node = data->head;
+    while (NULL != node)
+    {
+        Obj_t* next = node->next;
+        Obj_Free(data->alloc, node);
+        node = next;
+    }
+}
 
 
 void VM_Push(VM_t* vm, Value_t val)

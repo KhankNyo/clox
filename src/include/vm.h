@@ -36,14 +36,32 @@ typedef enum InterpretResult_t
 } InterpretResult_t;
 
 
+/* initializes vm */
 void VM_Init(VM_t* vm, Allocator_t* alloc);
+/* free vm's data */
 void VM_Free(VM_t* vm);
 
+
+/* pushes a value onto the vm's stack */
 void VM_Push(VM_t* vm, Value_t val);
+
+/* pops a value off the vm's stack */
 Value_t VM_Pop(VM_t* vm);
 
+
+
+/* 
+ *  interprets clox src code 
+ *  \returns INTERPRET_RUNTIME_ERROR if a runtime error was encountered
+ *  \returns INTERPRET_COMPILE_ERROR if a compilation error was encountered
+ *  \returns INTERPRET_OK if no errors were encountered
+ */
 InterpretResult_t VM_Interpret(VM_t* vm, Allocator_t* alloc, const char* src);
 
+
+
+/* free VMData_t, automatically called by VM_Free */
+void VM_FreeObjects(VMData_t* data);
 
 
 #endif /* _CLOX_VM_H_ */
