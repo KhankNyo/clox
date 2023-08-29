@@ -29,7 +29,7 @@
 
 #else
 /* the expression is still there because it may contain code that have effect */
-#  define CLOX_ASSERT(x) (x) 
+#  define CLOX_ASSERT(x) ((void)(x)) 
 #endif /* DEBUG */
 
 
