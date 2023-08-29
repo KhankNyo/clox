@@ -72,6 +72,13 @@ static void parse_precedence(Compiler_t* compiler, Precedence_t prec);
 /* \returns &s_rules[operator] */
 static const ParseRule_t* get_parse_rule(TokenType_t operator);
 
+
+
+static void declaration(Compiler_t* compiler);
+static void statement(Compiler_t* compiler);
+static void printStmt(Compiler_t* compiler);
+
+
 /* parses an expression */
 static void expression(Compiler_t* compiler);
 
@@ -109,8 +116,14 @@ static void emit_constant(Compiler_t* compiler, Value_t val);
 /* \returns the current compiling chunk */
 static Chunk_t* current_chunk(Compiler_t* compiler);
 
+
+
+
 /* query the scanner for the next token and put it into the parser */
 static void advance(Compiler_t* compiler);
+static bool match(Compiler_t* compiler, TokenType_t type);
+static bool check(const Compiler_t* compiler, TokenType_t type);
+
 
 
 /* consumes the next token, 
@@ -208,9 +221,10 @@ bool Compile(VMData_t* data, const char* src, Chunk_t* chunk)
 
 
     advance(&compiler);
-    expression(&compiler);
-    consume(&compiler, TOKEN_EOF, "Expected end of expression.");
-
+    while (!match(&compiler, TOKEN_EOF))
+    {
+        declaration(&compiler);
+    }
     const bool error = compiler.parser.had_error;
     compiler_end(&compiler);
     return !error;
@@ -308,6 +322,43 @@ static const ParseRule_t* get_parse_rule(TokenType_t type)
 {
     return &s_rules[type];
 }
+
+
+
+
+
+
+
+static void declaration(Compiler_t* compiler)
+{
+    statement(compiler);
+}
+
+
+
+
+
+
+
+static void statement(Compiler_t* compiler)
+{
+    if (match(compiler, TOKEN_PRINT))
+    {
+        printStmt(compiler);
+    }
+}
+
+
+
+
+static void printStmt(Compiler_t* compiler)
+{
+    /* TODO: print statement */
+}
+
+
+
+
 
 
 
@@ -488,6 +539,30 @@ static void advance(Compiler_t* compiler)
         error_at_current(parser, parser->curr.start);
     } while (TOKEN_ERROR == parser->curr.type);
 }
+
+
+
+
+static bool match(Compiler_t* compiler, TokenType_t type)
+{
+    if (!check(compiler, type))
+    {
+        return false;
+    }
+    advance(compiler);
+    return true;
+}
+
+
+static bool check(const Compiler_t* compiler, TokenType_t type)
+{
+    return compiler->parser.curr.type == type;
+}
+
+
+
+
+
 
 
 static void consume(Compiler_t* compiler, TokenType_t expected_type, const char* errmsg)
