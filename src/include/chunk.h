@@ -18,6 +18,9 @@ typedef enum Opc_t
 	OP_NIL,
 	OP_TRUE,
 	OP_FALSE,
+    OP_POP,
+    OP_GET_GLOBAL,
+    OP_DEFINE_GLOBAL,
 	OP_EQUAL,
 	OP_GREATER,
 	OP_LESS,
@@ -27,11 +30,14 @@ typedef enum Opc_t
 	OP_DIVIDE,
 	OP_NOT,
 	OP_NEGATE,
+    OP_PRINT,
 	OP_RETURN,
 
 
 	/* challenges */
 	OP_CONSTANT_LONG,
+    OP_DEFINE_GLOBAL_LONG,
+    OP_GET_GLOBAL_LONG,
 } Opc_t;
 
 

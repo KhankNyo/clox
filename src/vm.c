@@ -33,6 +33,7 @@ void VM_Init(VM_t* vm, Allocator_t* alloc)
     vm->data.alloc = alloc;
     stack_reset(vm);
     Table_Init(&vm->data.strings, alloc);
+    Table_Init(&vm->data.globals, alloc);
 }
 
 
@@ -41,6 +42,7 @@ void VM_Free(VM_t* vm)
 {
     VM_FreeObjects(&vm->data);
     Table_Free(&vm->data.strings);
+    Table_Free(&vm->data.globals);
     VM_Init(vm, vm->data.alloc);
 }
 
@@ -122,6 +124,7 @@ static InterpretResult_t run(VM_t* vm)
 {
 #define READ_BYTE() (*vm->ip++)
 #define READ_CONSTANT() (vm->chunk->consts.vals[READ_BYTE()])
+#define READ_STR() AS_STR(READ_CONSTANT())
 #define BINARY_OP(ValueType, op) \
 do{\
     if (!IS_NUMBER(peek(vm, 0)) || !IS_NUMBER(peek(vm, 1))) {\
@@ -209,12 +212,43 @@ do{\
         case OP_FALSE:      VM_Push(vm, BOOL_VAL(false)); break;
         case OP_NIL:        VM_Push(vm, NIL_VAL()); break;
 
-        case OP_RETURN:
+        case OP_RETURN:     return INTERPRET_OK;
+
+        case OP_PRINT:
         {
-            Value_Print(stderr, VM_Pop(vm));
-            puts("");
-            return INTERPRET_OK;
+            Value_Print(stdout, VM_Pop(vm));
+            printf("\n");
         }
+        break;
+
+        case OP_POP:
+        {
+            VM_Pop(vm);
+        }
+        break;
+
+        case OP_DEFINE_GLOBAL_LONG:
+        case OP_DEFINE_GLOBAL:
+        {
+            ObjString_t* name = READ_STR();
+            Table_Set(&vm->data.globals, name, peek(vm, 0));
+            VM_Pop(vm);
+        }
+        break;
+
+        case OP_GET_GLOBAL:
+        {
+            ObjString_t* name = READ_STR();
+            Value_t val;
+            
+            if (!Table_Get(&vm->data.globals, name, &val))
+            {
+                runtime_error(vm, "Undefined variable.", name->cstr);
+                return INTERPRET_RUNTIME_ERROR;
+            }
+            VM_Push(vm, val);
+        }
+        break;
 
         default: break;
         }
@@ -223,6 +257,7 @@ do{\
 
 #undef BINARY_OP
 #undef READ_CONSTANT
+#undef READ_STR
 #undef READ_BYTE
 }
 

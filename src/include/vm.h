@@ -15,6 +15,7 @@ struct VMData_t
 {
     Allocator_t* alloc;
     Table_t strings;
+    Table_t globals;
     Obj_t* head;
 };
 

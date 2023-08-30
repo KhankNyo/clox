@@ -71,17 +71,22 @@ static void parse_precedence(Compiler_t* compiler, Precedence_t prec);
 
 /* \returns &s_rules[operator] */
 static const ParseRule_t* get_parse_rule(TokenType_t operator);
+static size_t parse_variable(Compiler_t* compiler, const char* errmsg);
+static size_t identifier_constant(Compiler_t* compiler, const Token_t token);
+static void define_variable(Compiler_t* compiler, size_t global_index);
 
 
 
 static void declaration(Compiler_t* compiler);
+static void decl_var(Compiler_t* compiler);
+
 static void statement(Compiler_t* compiler);
-static void printStmt(Compiler_t* compiler);
+static void stmt_expr(Compiler_t* compiler);
+static void stmt_print(Compiler_t* compiler);
 
 
 /* parses an expression */
 static void expression(Compiler_t* compiler);
-
 
 static void string(Compiler_t* copmiler);
 static void literal(Compiler_t* compiler);
@@ -89,8 +94,8 @@ static void number(Compiler_t* compiler);
 static void grouping(Compiler_t* compiler);
 static void unary(Compiler_t* compiler);
 static void binary(Compiler_t* compiler);
-
-
+static void variable(Compiler_t* compiler);
+static void named_variable(Compiler_t* compiler, const Token_t name);
 
 
 
@@ -104,12 +109,8 @@ static void emit_2_bytes(Compiler_t* compiler, uint8_t byte1, uint8_t byte2);
 /* emits num_bytes bytes into the chunk */
 static void emit_bytes(Compiler_t* compile, size_t num_bytes, ...);
 
-
-
-
-
 static void emit_return(Compiler_t* compiler);
-static void emit_constant(Compiler_t* compiler, Value_t val);
+static size_t emit_constant(Compiler_t* compiler, Value_t val);
 
 
 
@@ -122,7 +123,7 @@ static Chunk_t* current_chunk(Compiler_t* compiler);
 /* query the scanner for the next token and put it into the parser */
 static void advance(Compiler_t* compiler);
 static bool match(Compiler_t* compiler, TokenType_t type);
-static bool check(const Compiler_t* compiler, TokenType_t type);
+static bool current_token_type(const Compiler_t* compiler, TokenType_t type);
 
 
 
@@ -144,6 +145,7 @@ static void error(Parser_t* parser, const char* msg);
 /* helper function used by error_at_current and error */
 static void error_at(Parser_t* parser, const Token_t* token, const char* msg);
 
+static void synchronize(Compiler_t* compiler);
 
 
 
@@ -172,7 +174,7 @@ static const ParseRule_t s_rules[] =
   [TOKEN_GREATER_EQUAL] = {NULL,     binary, PREC_COMPARISON},
   [TOKEN_LESS]          = {NULL,     binary, PREC_COMPARISON},
   [TOKEN_LESS_EQUAL]    = {NULL,     binary, PREC_COMPARISON},
-  [TOKEN_IDENTIFIER]    = {NULL,     NULL,   PREC_NONE},
+  [TOKEN_IDENTIFIER]    = {variable, NULL,   PREC_NONE},
   [TOKEN_STRING]        = {string,   NULL,   PREC_NONE},
   [TOKEN_NUMBER]        = {number,   NULL,   PREC_NONE},
   [TOKEN_AND]           = {NULL,     NULL,   PREC_NONE},
@@ -324,6 +326,38 @@ static const ParseRule_t* get_parse_rule(TokenType_t type)
 }
 
 
+static size_t parse_variable(Compiler_t* compiler, const char* errmsg)
+{
+    consume(compiler, TOKEN_IDENTIFIER, errmsg);
+    return identifier_constant(compiler, compiler->parser.prev);
+}
+
+
+static size_t identifier_constant(Compiler_t* compiler, const Token_t token)
+{
+    return emit_constant(compiler, OBJ_VAL(ObjStr_Copy(compiler->vmdata, token.start, token.len))); 
+}
+
+
+static void define_variable(Compiler_t* compiler, size_t global_index)
+{
+    if (global_index < UINT8_MAX)
+    {
+        emit_2_bytes(compiler, OP_DEFINE_GLOBAL, global_index);
+    }
+    else 
+    {
+        emit_bytes(compiler, 4, 
+            OP_DEFINE_GLOBAL_LONG, 
+            global_index & 0xff,
+            (global_index >> 8) & 0xff,
+            (global_index >> 16) & 0xff
+        );
+    }
+}
+
+
+
 
 
 
@@ -331,7 +365,39 @@ static const ParseRule_t* get_parse_rule(TokenType_t type)
 
 static void declaration(Compiler_t* compiler)
 {
-    statement(compiler);
+    if (match(compiler, TOKEN_VAR))
+    {
+        decl_var(compiler);
+    }
+    else 
+    {
+        statement(compiler);
+    }
+
+
+    if (compiler->parser.panic_mode)
+    {
+        synchronize(compiler);
+    }
+}
+
+
+static void decl_var(Compiler_t* compiler)
+{
+    uint32_t global = parse_variable(compiler, "Expect variable name.");
+
+    if (match(compiler, TOKEN_EQUAL))
+    {
+        expression(compiler);
+    }
+    else 
+    {
+        emit_byte(compiler, OP_NIL);
+    }
+
+    consume(compiler, TOKEN_SEMICOLON, "Expected ';' after expression.");
+
+    define_variable(compiler, global);
 }
 
 
@@ -344,16 +410,31 @@ static void statement(Compiler_t* compiler)
 {
     if (match(compiler, TOKEN_PRINT))
     {
-        printStmt(compiler);
+        stmt_print(compiler);
+    }
+    else 
+    {
+        stmt_expr(compiler);
     }
 }
 
 
 
 
-static void printStmt(Compiler_t* compiler)
+
+static void stmt_expr(Compiler_t* compiler)
 {
-    /* TODO: print statement */
+    expression(compiler);
+    consume(compiler, TOKEN_SEMICOLON, "Expect ';' after expression.");
+    emit_byte(compiler, OP_POP);
+}
+
+
+static void stmt_print(Compiler_t* compiler)
+{
+    expression(compiler);
+    consume(compiler, TOKEN_SEMICOLON, "Expeceted ';' after expression.");
+    emit_byte(compiler, OP_PRINT);
 }
 
 
@@ -463,6 +544,30 @@ static void binary(Compiler_t* compiler)
 }
 
 
+static void variable(Compiler_t* compiler)
+{
+    named_variable(compiler, compiler->parser.prev);
+}
+
+static void named_variable(Compiler_t* compiler, const Token_t name)
+{
+    size_t index = identifier_constant(compiler, name);
+    if (index < UINT8_MAX)
+    {
+        emit_2_bytes(compiler, OP_GET_GLOBAL, index);
+    }
+    else 
+    {
+        emit_bytes(compiler, 4,
+            OP_GET_GLOBAL_LONG,
+            index & 0xff,
+            (index >> 8) & 0xff,
+            (index >> 16) & 0xff
+        );
+    }
+}
+
+
 
 
 
@@ -488,7 +593,8 @@ static void emit_bytes(Compiler_t* compiler, size_t num_bytes, ...)
 
     for (size_t i = 0; i < num_bytes; i++)
     {
-        const uint8_t byte = va_arg(args, uint8_t);
+        /* this is utterly retarded */
+        const uint8_t byte = va_arg(args, int);
         emit_byte(compiler, byte);
     }
 
@@ -504,13 +610,14 @@ static void emit_return(Compiler_t* compiler)
     emit_byte(compiler, OP_RETURN);
 }
 
-static void emit_constant(Compiler_t* compiler, Value_t val)
+static size_t emit_constant(Compiler_t* compiler, Value_t val)
 {
     size_t val_addr = Chunk_WriteConstant(current_chunk(compiler), val, compiler->parser.prev.line);
     if (val_addr > MAX_CONST_IN_CHUNK)
     {
         error(&compiler->parser, "Too many constants in one chunk.");
     }
+    return val_addr;
 }
 
 
@@ -534,10 +641,13 @@ static void advance(Compiler_t* compiler)
     parser->prev = parser->curr;
 
 
-    do {
+    parser->curr = Scanner_ScanToken(&compiler->scanner);
+    while (TOKEN_ERROR == parser->curr.type) 
+    {
+        parser->prev = parser->curr;
         parser->curr = Scanner_ScanToken(&compiler->scanner);
         error_at_current(parser, parser->curr.start);
-    } while (TOKEN_ERROR == parser->curr.type);
+    }
 }
 
 
@@ -545,16 +655,16 @@ static void advance(Compiler_t* compiler)
 
 static bool match(Compiler_t* compiler, TokenType_t type)
 {
-    if (!check(compiler, type))
+    if (current_token_type(compiler, type))
     {
-        return false;
+        advance(compiler);
+        return true;
     }
-    advance(compiler);
-    return true;
+    return false;
 }
 
 
-static bool check(const Compiler_t* compiler, TokenType_t type)
+static bool current_token_type(const Compiler_t* compiler, TokenType_t type)
 {
     return compiler->parser.curr.type == type;
 }
@@ -633,4 +743,30 @@ static void error_at(Parser_t* parser, const Token_t* token, const char* msg)
 
 
 
+static void synchronize(Compiler_t* compiler)
+{
+    Parser_t *parser = &compiler->parser;
+    parser->panic_mode = false;
+    while (parser->curr.type != TOKEN_EOF)
+    {
+        if (parser->prev.type == TOKEN_SEMICOLON)
+        {
+            switch (parser->curr.type)
+            {
+            case TOKEN_CLASS:
+            case TOKEN_FUN:
+            case TOKEN_VAR:
+            case TOKEN_FOR:
+            case TOKEN_IF:
+            case TOKEN_WHILE:
+            case TOKEN_PRINT:
+            case TOKEN_RETURN:
+                return;
 
+            default: break; // Do nothing.
+            }
+        }
+
+        advance(compiler);
+    }
+}

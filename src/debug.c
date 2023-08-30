@@ -110,6 +110,30 @@ size_t Disasm_Instruction(FILE* fout, const Chunk_t* chunk, size_t offset)
 		break;
 
 
+    case OP_POP:
+        offset = singleByte(fout, "OP_POP", offset);
+        break;
+    case OP_PRINT:
+        offset = singleByte(fout, "OP_PRINT", offset);
+        break;
+
+    case OP_DEFINE_GLOBAL:
+        offset = constInstruction(fout, "OP_DEFINE_GLOBAL", chunk, offset, 1);
+        break;
+    case OP_DEFINE_GLOBAL_LONG:
+        offset = constInstruction(fout, "OP_DEFINE_GLOBAL_LONG", chunk, offset, 3);
+        break;
+
+
+    case OP_GET_GLOBAL:
+        offset = constInstruction(fout, "OP_GET_GLOBAL", chunk, offset, 1);
+        break;
+
+    case OP_GET_GLOBAL_LONG:
+        offset = constInstruction(fout, "OP_GET_GLOBAL", chunk, offset, 3);
+        break;
+
+
 
 	default:
 		fprintf(fout, "Unknown opcode %d", ins);
