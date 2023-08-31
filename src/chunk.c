@@ -49,6 +49,17 @@ size_t Chunk_AddConstant(Chunk_t* chunk, Value_t constant)
 }
 
 
+size_t Chunk_AddUniqueConstant(Chunk_t* chunk, Value_t constant)
+{
+    size_t index = 0;
+    if (ValArr_Find(&chunk->consts, constant, &index))
+    {
+        return index;
+    }
+    return Chunk_AddConstant(chunk, constant);
+}
+
+
 
 size_t Chunk_WriteConstant(Chunk_t* chunk, Value_t constant, line_t line)
 {

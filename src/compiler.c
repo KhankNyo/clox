@@ -345,7 +345,7 @@ static size_t parse_variable(Compiler_t* compiler, const char* errmsg)
 
 static size_t identifier_constant(Compiler_t* compiler, const Token_t token)
 {
-    return Chunk_AddConstant(current_chunk(compiler), 
+    return Chunk_AddUniqueConstant(current_chunk(compiler), 
         OBJ_VAL(ObjStr_Copy(compiler->vmdata, token.start, token.len))
     ); 
 }

@@ -36,6 +36,25 @@ void ValArr_Write(ValueArr_t* valarr, Value_t val)
 }
 
 
+
+
+bool ValArr_Find(const ValueArr_t* valarr, Value_t val, size_t* index_out)
+{
+    size_t i = 0; 
+    for (; i < valarr->size; i++)
+    {
+        if (Value_Equal(val, valarr->vals[i]))
+        {
+            *index_out = i;
+            return true;
+        }
+    }
+    return i != valarr->size;
+}
+
+
+
+
 void ValArr_Free(ValueArr_t* valarr)
 {
 	FREE_ARRAY(valarr->alloc, Value_t, valarr->vals, valarr->capacity);

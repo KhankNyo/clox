@@ -57,6 +57,7 @@ typedef struct
 
 void ValArr_Init(ValueArr_t* valarr, Allocator_t* alloc);
 void ValArr_Write(ValueArr_t* valarr, Value_t val);
+bool ValArr_Find(const ValueArr_t* valarr, Value_t val, size_t* index_out);
 void ValArr_Free(ValueArr_t* valarr);
 
 void Value_Print(FILE* fout, const Value_t val);

@@ -67,6 +67,13 @@ void Chunk_Write(Chunk_t* chunk, uint8_t byte, line_t line);
 */
 size_t Chunk_AddConstant(Chunk_t* chunk, Value_t constant);
 
+/*
+ * adds a constant if it's not already in the table, or 
+ * \return the index of the constant that's already in the table 
+ */
+size_t Chunk_AddUniqueConstant(Chunk_t* chunk, Value_t constant);
+
+
 
 /* adds a constant to the consts array and add an appropriate instruction for loading that constant,
 *	\returns the offset of the constant in the value array
