@@ -113,16 +113,16 @@ static char* load_file_content(Allocator_t* alloc, const char* file_path, size_t
     const size_t file_size = ftell(f);
     fseek(f, 0, SEEK_SET);
 
+
     char* file_content = Allocator_Alloc(alloc, file_size + 1);
-    fclose(f);
-
-
     const size_t read_size = fread(file_content, 1, file_size, f);
+    fclose(f);
     if (read_size != file_size)
     {
         fprintf(stderr, 
             "Could not read file properly: read %zu bytes, expected to read %zu bytes\n",
-            read_size, file_size);
+            read_size, file_size
+        );
         exit(CLOX_UNIX_EBADMSG);
     }
     file_content[file_size] = '\0';

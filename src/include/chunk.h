@@ -21,6 +21,7 @@ typedef enum Opc_t
     OP_POP,
     OP_GET_GLOBAL,
     OP_DEFINE_GLOBAL,
+    OP_SET_GLOBAL,
 	OP_EQUAL,
 	OP_GREATER,
 	OP_LESS,
@@ -35,9 +36,10 @@ typedef enum Opc_t
 
 
 	/* challenges */
-	OP_CONSTANT_LONG,
-    OP_DEFINE_GLOBAL_LONG,
-    OP_GET_GLOBAL_LONG,
+	OP_CONSTANT_LONG        = OP_CONSTANT | 0x80,
+    OP_DEFINE_GLOBAL_LONG   = OP_DEFINE_GLOBAL | 0x80,
+    OP_GET_GLOBAL_LONG      = OP_GET_GLOBAL | 0x80,
+    OP_SET_GLOBAL_LONG      = OP_SET_GLOBAL | 0x80,
 } Opc_t;
 
 

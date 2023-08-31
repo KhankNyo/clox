@@ -133,6 +133,14 @@ size_t Disasm_Instruction(FILE* fout, const Chunk_t* chunk, size_t offset)
         offset = constInstruction(fout, "OP_GET_GLOBAL", chunk, offset, 3);
         break;
 
+    case OP_SET_GLOBAL:
+        offset = constInstruction(fout, "OP_SET_GLOBAL", chunk, offset, 1);
+        break;
+
+    case OP_SET_GLOBAL_LONG:
+        offset = constInstruction(fout, "OP_SET_GLOBAL_LONG", chunk, offset, 3);
+        break;
+
 
 
 	default:

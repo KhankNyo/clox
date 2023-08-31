@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "include/common.h"
+#include "include/table.h"
 #include "include/vm.h"
 #include "include/compiler.h"
 #include "include/debug.h"
@@ -247,6 +248,17 @@ do{\
                 return INTERPRET_RUNTIME_ERROR;
             }
             VM_Push(vm, val);
+        }
+        break;
+        case OP_SET_GLOBAL:
+        {
+            ObjString_t* name = READ_STR();
+            if (Table_Set(&vm->data.globals, name, peek(vm, 0)))
+            {
+                Table_Delete(&vm->data.globals, name);
+                runtime_error(vm, "Undefined variable: '%s'.", name->cstr);
+                return INTERPRET_RUNTIME_ERROR;
+            }
         }
         break;
 

@@ -23,6 +23,7 @@ typedef struct Parser_t
 typedef enum Precedence_t {
     PREC_NONE = 0,
     PREC_ASSIGNMENT,  // =
+                      // emit_global(compiler, OP_DEFINE_GLOBAL, global_index);
     PREC_OR,          // or
     PREC_AND,         // and
     PREC_EQUALITY,    // == !=
@@ -46,7 +47,8 @@ typedef struct Compiler_t
 } Compiler_t;
 
 
-typedef void (*ParseFn_t)(Compiler_t*);
+typedef void (*ParseFn_t)(Compiler_t*, bool);
+
 typedef struct ParseRule_t
 {
     ParseFn_t prefix;
@@ -86,16 +88,17 @@ static void stmt_print(Compiler_t* compiler);
 
 
 /* parses an expression */
-static void expression(Compiler_t* compiler);
+static void expression(Compiler_t* compiler, bool can_assign);
 
-static void string(Compiler_t* copmiler);
-static void literal(Compiler_t* compiler);
-static void number(Compiler_t* compiler);
-static void grouping(Compiler_t* compiler);
-static void unary(Compiler_t* compiler);
-static void binary(Compiler_t* compiler);
-static void variable(Compiler_t* compiler);
-static void named_variable(Compiler_t* compiler, const Token_t name);
+static void string(Compiler_t* copmiler, bool can_assign);
+static void literal(Compiler_t* compiler, bool can_assign);
+static void number(Compiler_t* compiler, bool can_assign);
+static void grouping(Compiler_t* compiler, bool can_assign);
+static void unary(Compiler_t* compiler, bool can_assign);
+static void binary(Compiler_t* compiler, bool can_assign);
+static void variable(Compiler_t* compiler, bool can_assign);
+
+static void named_variable(Compiler_t* compiler, const Token_t name, bool can_assign);
 
 
 
@@ -109,6 +112,7 @@ static void emit_2_bytes(Compiler_t* compiler, uint8_t byte1, uint8_t byte2);
 /* emits num_bytes bytes into the chunk */
 static void emit_bytes(Compiler_t* compile, size_t num_bytes, ...);
 
+static void emit_global(Compiler_t* compiler, Opc_t opcode, size_t addr);
 static void emit_return(Compiler_t* compiler);
 static size_t emit_constant(Compiler_t* compiler, Value_t val);
 
@@ -297,7 +301,8 @@ static void parse_precedence(Compiler_t* compiler, Precedence_t prec)
 
     /* parses prefix operator */
     /* NOTE: prefix operator for a binary operator is its first argument (left operand) */
-    prefix_parser(compiler);
+    bool can_assign = prec <= PREC_ASSIGNMENT;
+    prefix_parser(compiler, can_assign);
 
 
     /* 
@@ -314,7 +319,12 @@ static void parse_precedence(Compiler_t* compiler, Precedence_t prec)
         advance(compiler);
         ParseFn_t infix_parser = get_parse_rule(compiler->parser.prev.type)->infix;
         CLOX_ASSERT(NULL != infix_parser);
-        infix_parser(compiler);
+        infix_parser(compiler, can_assign);
+    }
+
+    if (can_assign && match(compiler, TOKEN_EQUAL))
+    {
+        error(&compiler->parser, "Invalid assignment target.");
     }
 }
 
@@ -335,25 +345,15 @@ static size_t parse_variable(Compiler_t* compiler, const char* errmsg)
 
 static size_t identifier_constant(Compiler_t* compiler, const Token_t token)
 {
-    return emit_constant(compiler, OBJ_VAL(ObjStr_Copy(compiler->vmdata, token.start, token.len))); 
+    return Chunk_AddConstant(current_chunk(compiler), 
+        OBJ_VAL(ObjStr_Copy(compiler->vmdata, token.start, token.len))
+    ); 
 }
 
 
 static void define_variable(Compiler_t* compiler, size_t global_index)
 {
-    if (global_index < UINT8_MAX)
-    {
-        emit_2_bytes(compiler, OP_DEFINE_GLOBAL, global_index);
-    }
-    else 
-    {
-        emit_bytes(compiler, 4, 
-            OP_DEFINE_GLOBAL_LONG, 
-            global_index & 0xff,
-            (global_index >> 8) & 0xff,
-            (global_index >> 16) & 0xff
-        );
-    }
+    emit_global(compiler, OP_DEFINE_GLOBAL, global_index);
 }
 
 
@@ -384,11 +384,11 @@ static void declaration(Compiler_t* compiler)
 
 static void decl_var(Compiler_t* compiler)
 {
-    uint32_t global = parse_variable(compiler, "Expect variable name.");
+    size_t global = parse_variable(compiler, "Expect variable name.");
 
     if (match(compiler, TOKEN_EQUAL))
     {
-        expression(compiler);
+        expression(compiler, true);
     }
     else 
     {
@@ -396,7 +396,6 @@ static void decl_var(Compiler_t* compiler)
     }
 
     consume(compiler, TOKEN_SEMICOLON, "Expected ';' after expression.");
-
     define_variable(compiler, global);
 }
 
@@ -424,7 +423,7 @@ static void statement(Compiler_t* compiler)
 
 static void stmt_expr(Compiler_t* compiler)
 {
-    expression(compiler);
+    expression(compiler, false);
     consume(compiler, TOKEN_SEMICOLON, "Expect ';' after expression.");
     emit_byte(compiler, OP_POP);
 }
@@ -432,7 +431,7 @@ static void stmt_expr(Compiler_t* compiler)
 
 static void stmt_print(Compiler_t* compiler)
 {
-    expression(compiler);
+    expression(compiler, false);
     consume(compiler, TOKEN_SEMICOLON, "Expeceted ';' after expression.");
     emit_byte(compiler, OP_PRINT);
 }
@@ -444,8 +443,9 @@ static void stmt_print(Compiler_t* compiler)
 
 
 
-static void expression(Compiler_t* compiler)
+static void expression(Compiler_t* compiler, bool can_assign)
 {
+    (void)can_assign;
     parse_precedence(compiler, PREC_ASSIGNMENT);
 }
 
@@ -456,8 +456,9 @@ static void expression(Compiler_t* compiler)
 
 
 
-static void string(Compiler_t* compiler)
+static void string(Compiler_t* compiler, bool can_assign)
 {
+    (void)can_assign;
     emit_constant(compiler, 
         OBJ_VAL(ObjStr_Copy(compiler->vmdata, 
             compiler->parser.prev.start + 1, compiler->parser.prev.len - 2))
@@ -465,8 +466,9 @@ static void string(Compiler_t* compiler)
 }
 
 
-static void literal(Compiler_t* compiler)
+static void literal(Compiler_t* compiler, bool can_assign)
 {
+    (void)can_assign;
     switch (compiler->parser.prev.type)
     {
     case TOKEN_TRUE:    emit_byte(compiler, OP_TRUE); break;
@@ -477,23 +479,25 @@ static void literal(Compiler_t* compiler)
 }
 
 
-static void number(Compiler_t* compiler)
+static void number(Compiler_t* compiler, bool can_assign)
 {
+    (void)can_assign;
     const Value_t val = NUMBER_VAL(strtod(compiler->parser.prev.start, NULL));
     emit_constant(compiler, val);
 }
 
 
-static void grouping(Compiler_t* compiler)
+static void grouping(Compiler_t* compiler, bool can_assign)
 {
     /* assumes that '(' is already consumed */
-    expression(compiler);
+    expression(compiler, can_assign);
     consume(compiler, TOKEN_RIGHT_PAREN, "Expected ')' after expression.");
 }
 
 
-static void unary(Compiler_t* compiler)
+static void unary(Compiler_t* compiler, bool can_assign)
 {
+    (void)can_assign;
     const TokenType_t operator = compiler->parser.prev.type;
 
     /* compiles first operand */
@@ -512,15 +516,15 @@ static void unary(Compiler_t* compiler)
 }
 
 
-static void binary(Compiler_t* compiler)
+static void binary(Compiler_t* compiler, bool can_assign)
 {
+    (void)can_assign;
     const TokenType_t operator = compiler->parser.prev.type;
     const ParseRule_t* rule = get_parse_rule(operator);
     /* 
     *   because most binary operators are left associative, 
     *   the next operator does not have equal precedence to the current operator
     */
-    /* TODO: assignment operator */
     parse_precedence(compiler, (Precedence_t)(rule->precedence + 1));
 
 
@@ -544,27 +548,25 @@ static void binary(Compiler_t* compiler)
 }
 
 
-static void variable(Compiler_t* compiler)
+static void variable(Compiler_t* compiler, bool can_assign)
 {
-    named_variable(compiler, compiler->parser.prev);
+    named_variable(compiler, compiler->parser.prev, can_assign);
 }
 
-static void named_variable(Compiler_t* compiler, const Token_t name)
+static void named_variable(Compiler_t* compiler, const Token_t name, bool can_assign)
 {
     size_t index = identifier_constant(compiler, name);
-    if (index < UINT8_MAX)
+    
+    if (can_assign && match(compiler, TOKEN_EQUAL))
     {
-        emit_2_bytes(compiler, OP_GET_GLOBAL, index);
+        expression(compiler, can_assign);
+        emit_global(compiler, OP_SET_GLOBAL, index);
     }
     else 
     {
-        emit_bytes(compiler, 4,
-            OP_GET_GLOBAL_LONG,
-            index & 0xff,
-            (index >> 8) & 0xff,
-            (index >> 16) & 0xff
-        );
+        emit_global(compiler, OP_GET_GLOBAL, index);
     }
+    
 }
 
 
@@ -593,12 +595,29 @@ static void emit_bytes(Compiler_t* compiler, size_t num_bytes, ...)
 
     for (size_t i = 0; i < num_bytes; i++)
     {
-        /* this is utterly retarded */
-        const uint8_t byte = va_arg(args, int);
+        const uint8_t byte = va_arg(args, unsigned int);
         emit_byte(compiler, byte);
     }
 
     va_end(args);
+}
+
+
+static void emit_global(Compiler_t* compiler, Opc_t opcode, size_t addr)
+{
+    if (addr <= UINT8_MAX)
+    {
+        emit_2_bytes(compiler, opcode, addr);
+    }
+    else 
+    {
+        emit_bytes(compiler, 4, 
+            opcode | 0x80,
+            addr,
+            addr >> 8,
+            addr >> 16
+        );
+    }
 }
 
 

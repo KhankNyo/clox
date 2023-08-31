@@ -47,8 +47,8 @@ bool Table_Get(Table_t* table, const ObjString_t* key, Value_t* val_out);
 /* 
  *  Set a key in the table to the correspond value, will override the 
  *  entry's value if an entry with the given key already exist
- *  \returns true if the entry with the corresponding key already exist
- *  \returns false if the key does not exist, in that case, a new entry will be created 
+ *  \returns true if the key did not exist before, an entry will be created with the given key
+ *  \returns false if the key already exist, the value associated with the key will be overwritten 
  *  to hold the given key and value
  */
 bool Table_Set(Table_t* table, ObjString_t* key, Value_t val);
