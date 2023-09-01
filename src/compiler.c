@@ -1,6 +1,7 @@
 
 
 #include <stdarg.h>
+#include <string.h>
 
 #include "include/common.h"
 #include "include/memory.h"
@@ -69,6 +70,8 @@ typedef struct ParseRule_t
 } ParseRule_t;
 
 
+#define VAR_UNDEFINED -1
+#define LOCAL_DEFINED(p_local) ((p_local)->depth != VAR_UNDEFINED)
 
 
 
@@ -88,14 +91,30 @@ static void parse_precedence(Compiler_t* compiler, Precedence_t prec);
 
 /* \returns &s_rules[operator] */
 static const ParseRule_t* get_parse_rule(TokenType_t operator);
+
 static size_t parse_variable(Compiler_t* compiler, const char* errmsg);
-static size_t identifier_constant(Compiler_t* compiler, const Token_t token);
+
+/* emit a string in the constant table with the given identifier */
+static size_t identifier_constant(Compiler_t* compiler, const Token_t identifier);
+static bool identifiers_equal(const Token_t a, const Token_t b);
+
+/* define a global variable */
 static void define_variable(Compiler_t* compiler, size_t global_index);
+
+/* ensures that a local variable name is unique and calls add_local() */
 static void declare_local(Compiler_t* compiler);
+
+/* adds the previous token into the scope */
+static void add_local(Compiler_t* compiler, const Token_t name);
+
+
+
 
 
 static void declaration(Compiler_t* compiler);
 static void decl_var(Compiler_t* compiler);
+
+
 
 
 static void statement(Compiler_t* compiler);
@@ -120,6 +139,7 @@ static void unary(Compiler_t* compiler, bool can_assign);
 static void binary(Compiler_t* compiler, bool can_assign);
 static void variable(Compiler_t* compiler, bool can_assign);
 
+/* get or set a variable with the given name */
 static void named_variable(Compiler_t* compiler, const Token_t name, bool can_assign);
 
 
@@ -134,8 +154,11 @@ static void emit_2_bytes(Compiler_t* compiler, uint8_t byte1, uint8_t byte2);
 /* emits num_bytes bytes into the chunk */
 static void emit_bytes(Compiler_t* compile, size_t num_bytes, ...);
 
+/* emits an opcode to access an object in the constant table */
 static void emit_global(Compiler_t* compiler, Opc_t opcode, size_t addr);
 static void emit_return(Compiler_t* compiler);
+
+/* pushes a constant into the constant table */
 static size_t emit_constant(Compiler_t* compiler, Value_t val);
 
 
@@ -381,6 +404,13 @@ static size_t parse_variable(Compiler_t* compiler, const char* errmsg)
 }
 
 
+static void mark_initialized(Compiler_t* compiler)
+{
+    compiler->locals[compiler->local_count - 1].depth = 
+        compiler->scope_depth;
+}
+
+
 static size_t identifier_constant(Compiler_t* compiler, const Token_t token)
 {
     return Chunk_AddUniqueConstant(current_chunk(compiler), 
@@ -389,10 +419,40 @@ static size_t identifier_constant(Compiler_t* compiler, const Token_t token)
 }
 
 
+static bool identifiers_equal(const Token_t a, const Token_t b)
+{
+    if (a.len != b.len)
+    {
+        return false;
+    }
+
+    return memcmp(a.start, b.start, a.len) == 0;
+}
+
+
+static int resolve_local(Compiler_t* compiler, const Token_t name)
+{
+    for (int i = compiler->local_count - 1; i >= 0; i--)
+    {
+        Local_t* local = &compiler->locals[i];
+        if (identifiers_equal(local->name, name))
+        {
+            if (!LOCAL_DEFINED(local))
+            {
+                error(&compiler->parser, "Can't read local variable in its own initializer.");
+            }
+            return i;
+        }
+    }
+    return VAR_UNDEFINED;
+}
+
+
 static void define_variable(Compiler_t* compiler, size_t global_index)
 {
     if (compiler->scope_depth > 0)
     {
+        mark_initialized(compiler);
         return;
     }
     emit_global(compiler, OP_DEFINE_GLOBAL, global_index);
@@ -401,8 +461,41 @@ static void define_variable(Compiler_t* compiler, size_t global_index)
 
 static void declare_local(Compiler_t* compiler)
 {
+    Token_t* name = &compiler->parser.prev;
+
+    for (int i = compiler->local_count - 1; i >= 0; i++)
+    {
+        Local_t* local = &compiler->locals[i];
+        if (LOCAL_DEFINED(local) && local->depth < compiler->scope_depth)
+        {
+            break;
+        }
+
+
+        if (identifiers_equal(local->name, *name))
+        {
+            error(&compiler->parser, "Already a varibale with this name in this scope.");
+        }
+    }
+
+    add_local(compiler, *name);
 }
 
+
+static void add_local(Compiler_t* compiler, const Token_t name)
+{
+    if (compiler->local_count >= UINT8_COUNT)
+    {
+        error(&compiler->parser, "Too many local variables in scope.");
+        return;
+    }
+
+    Local_t *local = &compiler->locals[compiler->local_count];
+
+    local->name = name;
+    local->depth = VAR_UNDEFINED;
+    compiler->local_count += 1;
+}
 
 
 
@@ -515,6 +608,17 @@ static void stmt_block(Compiler_t* compiler)
 static void scope_end(Compiler_t* compiler)
 {
     compiler->scope_depth -= 1;
+    int popped_vars = 0;
+
+    while (compiler->local_count > 0
+        && compiler->locals[compiler->local_count - 1].depth > compiler->scope_depth
+    )
+    {
+        popped_vars += 1;
+        compiler->local_count -= 1;
+    }
+
+    emit_2_bytes(compiler, OP_POPN, popped_vars);
 }
 
 
@@ -542,6 +646,7 @@ static void string(Compiler_t* compiler, bool can_assign)
     (void)can_assign;
     emit_constant(compiler, 
         OBJ_VAL(ObjStr_Copy(compiler->vmdata, 
+            /* not including '"' in string literals */
             compiler->parser.prev.start + 1, compiler->parser.prev.len - 2))
     );
 }
@@ -634,18 +739,35 @@ static void variable(Compiler_t* compiler, bool can_assign)
     named_variable(compiler, compiler->parser.prev, can_assign);
 }
 
+
 static void named_variable(Compiler_t* compiler, const Token_t name, bool can_assign)
 {
-    size_t index = identifier_constant(compiler, name);
-    
-    if (can_assign && match(compiler, TOKEN_EQUAL))
+    uint8_t get_op, set_op;
+    int arg = resolve_local(compiler, name);
+    if (VAR_UNDEFINED == arg) /* then is assumed to be global */
     {
-        expression(compiler, can_assign);
-        emit_global(compiler, OP_SET_GLOBAL, index);
+        arg = identifier_constant(compiler, name);
+        get_op = OP_GET_GLOBAL;
+        set_op = OP_SET_GLOBAL;
     }
     else 
     {
-        emit_global(compiler, OP_GET_GLOBAL, index);
+        get_op = OP_GET_LOCAL;
+        set_op = OP_SET_LOCAL;
+    }
+    
+
+
+    
+    if (can_assign && match(compiler, TOKEN_EQUAL))
+    {
+        /* compiles initializer */
+        expression(compiler, can_assign);
+        emit_global(compiler, set_op, (unsigned)arg);
+    }
+    else 
+    {
+        emit_global(compiler, get_op,  (unsigned)arg);
     }
     
 }
@@ -712,7 +834,9 @@ static void emit_return(Compiler_t* compiler)
 
 static size_t emit_constant(Compiler_t* compiler, Value_t val)
 {
-    size_t val_addr = Chunk_WriteConstant(current_chunk(compiler), val, compiler->parser.prev.line);
+    size_t val_addr = Chunk_WriteConstant(
+        current_chunk(compiler), val, compiler->parser.prev.line
+    );
     if (val_addr > MAX_CONST_IN_CHUNK)
     {
         error(&compiler->parser, "Too many constants in one chunk.");

@@ -217,16 +217,13 @@ do{\
 
         case OP_PRINT:
         {
-            Value_Print(stdout, VM_Pop(vm));
+            Value_Print(stdout, peek(vm, 0));
             printf("\n");
         }
         break;
 
-        case OP_POP:
-        {
-            VM_Pop(vm);
-        }
-        break;
+        case OP_POP:        VM_Pop(vm); break;
+        case OP_POPN:       vm->sp -= READ_BYTE(); break;
 
         case OP_DEFINE_GLOBAL_LONG:
         case OP_DEFINE_GLOBAL:
@@ -234,6 +231,20 @@ do{\
             ObjString_t* name = READ_STR();
             Table_Set(&vm->data.globals, name, peek(vm, 0));
             VM_Pop(vm);
+        }
+        break;
+
+
+        case OP_SET_LOCAL:
+        {
+            uint8_t i = READ_BYTE();
+            vm->stack[i] = peek(vm, 0);
+        }
+        break;
+        case OP_GET_LOCAL:
+        {
+            uint8_t i = READ_BYTE();
+            VM_Push(vm, vm->stack[i]);
         }
         break;
 

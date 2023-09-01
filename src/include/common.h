@@ -35,6 +35,7 @@
 
 #define UINT8_COUNT (UINT8_MAX + 1)
 
+#define STATIC_ARRSZ(comptime_array) (sizeof(comptime_array) / sizeof(comptime_array[0])) 
 
 
 
