@@ -23,6 +23,12 @@ static bool is_falsey(const Value_t val);
 static void str_concatenate(VM_t* vm);
 
 static void runtime_error(VM_t* vm, const char* fmt, ...);
+static void debug_trace_execution(const VM_t* vm);
+static uint32_t read_long(VM_t* vm);
+
+
+
+
 
 
 
@@ -123,9 +129,46 @@ void VM_FreeObjs(VM_t* vm)
 
 static InterpretResult_t run(VM_t* vm)
 {
+/* fuck macros */
+
 #define READ_BYTE() (*vm->ip++)
 #define READ_CONSTANT() (vm->chunk->consts.vals[READ_BYTE()])
+
+
+
+#define READ_LONG() read_long(vm)
+#define READ_CONSTANT_LONG() (vm->chunk->consts.vals[READ_LONG()])
+
+
+
 #define READ_STR() AS_STR(READ_CONSTANT())
+#define READ_STR_LONG() AS_STR(READ_CONSTANT_LONG())
+
+
+
+
+#define GET_GLOBAL(macro_read_str) \
+    do {\
+        ObjString_t* name = macro_read_str();\
+        Value_t val;\
+        if (!Table_Get(&vm->data.globals, name, &val)) {\
+            runtime_error(vm, "Undefined variable: '%s'.", name->cstr);\
+            return INTERPRET_RUNTIME_ERROR;\
+        }\
+        VM_Push(vm, val);\
+    } while (0)
+
+#define SET_GLOBAL(macro_read_str) \
+    do {\
+        ObjString_t* name = macro_read_str();\
+        if (Table_Set(&vm->data.globals, name, peek(vm, 0))) {\
+            Table_Delete(&vm->data.globals, name);\
+            runtime_error(vm, "Undefined variable: '%s'.", name->cstr);\
+            return INTERPRET_RUNTIME_ERROR;\
+        }\
+    } while (0)
+
+
 #define BINARY_OP(ValueType, op) \
 do{\
     if (!IS_NUMBER(peek(vm, 0)) || !IS_NUMBER(peek(vm, 1))) {\
@@ -138,31 +181,21 @@ do{\
 }while(0)
 
 
+
+
+
+
+
     while (true)
     {
-
-#ifdef DEBUG_TRACE_EXECUTION
-        fprintf(stderr, "          ");
-        for (Value_t* slot = vm->stack; slot < vm->sp; slot++) {
-            fprintf(stderr, "[ ");
-            Value_Print(stderr, *slot);
-            fprintf(stderr, " ]");
-        }
-        fprintf(stderr, "\n");
-        Disasm_Instruction(stderr, vm->chunk, vm->ip - vm->chunk->code);
-#endif /* DEBUG_TRACE_EXECUTION */
-
+        debug_trace_execution(vm);
         uint8_t ins = READ_BYTE();
+
         switch (ins)
         {
 
-        case OP_CONSTANT:
-        case OP_CONSTANT_LONG:
-        {
-            const Value_t constant = READ_CONSTANT();
-            VM_Push(vm, constant);
-        }
-        break;
+        case OP_CONSTANT_LONG:  VM_Push(vm, READ_CONSTANT_LONG()); break;
+        case OP_CONSTANT:   VM_Push(vm, READ_CONSTANT()); break;
 
         case OP_NEGATE:
             if (!IS_NUMBER(peek(vm, 0)))
@@ -172,9 +205,8 @@ do{\
             }
             VM_Push(vm, NUMBER_VAL(-AS_NUMBER(VM_Pop(vm)))); 
             break;
-        case OP_NOT:
-            VM_Push(vm, BOOL_VAL(is_falsey(VM_Pop(vm))));
-            break;
+
+        case OP_NOT:        VM_Push(vm, BOOL_VAL(is_falsey(VM_Pop(vm)))); break;
 
 
         case OP_ADD:
@@ -217,7 +249,7 @@ do{\
 
         case OP_PRINT:
         {
-            Value_Print(stdout, peek(vm, 0));
+            Value_Print(stdout, VM_Pop(vm));
             printf("\n");
         }
         break;
@@ -226,6 +258,12 @@ do{\
         case OP_POPN:       vm->sp -= READ_BYTE(); break;
 
         case OP_DEFINE_GLOBAL_LONG:
+        {
+            ObjString_t* name = READ_STR_LONG();
+            Table_Set(&vm->data.globals, name, peek(vm, 0));
+            VM_Pop(vm);
+        }
+        break;
         case OP_DEFINE_GLOBAL:
         {
             ObjString_t* name = READ_STR();
@@ -248,31 +286,11 @@ do{\
         }
         break;
 
-        case OP_GET_GLOBAL:
-        {
-            ObjString_t* name = READ_STR();
-            Value_t val;
-            
-            if (!Table_Get(&vm->data.globals, name, &val))
-            {
-                runtime_error(vm, "Undefined variable.", name->cstr);
-                return INTERPRET_RUNTIME_ERROR;
-            }
-            VM_Push(vm, val);
-        }
-        break;
-        case OP_SET_GLOBAL:
-        {
-            ObjString_t* name = READ_STR();
-            if (Table_Set(&vm->data.globals, name, peek(vm, 0)))
-            {
-                Table_Delete(&vm->data.globals, name);
-                runtime_error(vm, "Undefined variable: '%s'.", name->cstr);
-                return INTERPRET_RUNTIME_ERROR;
-            }
-        }
-        break;
-
+        case OP_GET_GLOBAL_LONG:    GET_GLOBAL(READ_STR_LONG); break;
+        case OP_GET_GLOBAL:         GET_GLOBAL(READ_STR); break;
+        case OP_SET_GLOBAL_LONG:    SET_GLOBAL(READ_STR_LONG); break;
+        case OP_SET_GLOBAL:         SET_GLOBAL(READ_STR); break;
+        
         default: break;
         }
     }
@@ -280,8 +298,11 @@ do{\
 
 #undef BINARY_OP
 #undef READ_CONSTANT
+#undef READ_CONSTANT_LONG
 #undef READ_STR
+#undef READ_STR_LONG
 #undef READ_BYTE
+#undef READ_LONG
 }
 
 
@@ -364,6 +385,32 @@ static void runtime_error(VM_t* vm, const char* fmt, ...)
 }
 
 
+
+static void debug_trace_execution(const VM_t* vm)
+{
+#ifdef DEBUG_TRACE_EXECUTION 
+    fprintf(stderr, "          ");
+    for (const Value_t* slot = vm->stack; slot < vm->sp; slot++) 
+    {
+        fprintf(stderr, "[ ");
+        Value_Print(stderr, *slot);
+        fprintf(stderr, " ]");
+    }
+    fprintf(stderr, "\n");
+    Disasm_Instruction(stderr, vm->chunk, vm->ip - vm->chunk->code);
+#else
+    (void)vm;
+#endif /* DEBUG_TRACE_EXECUTION */
+}
+
+
+static uint32_t read_long(VM_t* vm)
+{
+    uint32_t operand = *vm->ip++;
+    operand |= ((uint32_t)*vm->ip++) << 8;
+    operand |= ((uint32_t)*vm->ip++) << 16;
+    return operand;
+}
 
 
 
