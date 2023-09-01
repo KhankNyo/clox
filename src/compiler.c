@@ -38,13 +38,25 @@ typedef enum Precedence_t {
 
 
 
+typedef struct Local_t
+{
+    Token_t name;
+    int depth;
+} Local_t;
+
 typedef struct Compiler_t
 {
     Scanner_t scanner;
     Parser_t parser;
     Chunk_t* chunk;
     VMData_t* vmdata;
+    
+    Local_t locals[UINT8_COUNT];
+    int local_count;
+    int scope_depth;
 } Compiler_t;
+
+
 
 
 typedef void (*ParseFn_t)(Compiler_t*, bool);
@@ -55,6 +67,9 @@ typedef struct ParseRule_t
     ParseFn_t infix;
     Precedence_t precedence;
 } ParseRule_t;
+
+
+
 
 
 
@@ -76,15 +91,22 @@ static const ParseRule_t* get_parse_rule(TokenType_t operator);
 static size_t parse_variable(Compiler_t* compiler, const char* errmsg);
 static size_t identifier_constant(Compiler_t* compiler, const Token_t token);
 static void define_variable(Compiler_t* compiler, size_t global_index);
-
+static void declare_local(Compiler_t* compiler);
 
 
 static void declaration(Compiler_t* compiler);
 static void decl_var(Compiler_t* compiler);
 
+
 static void statement(Compiler_t* compiler);
 static void stmt_expr(Compiler_t* compiler);
 static void stmt_print(Compiler_t* compiler);
+
+static void scope_begin(Compiler_t* compiler);
+static void stmt_block(Compiler_t* compiler);
+static void scope_end(Compiler_t* compiler);
+
+
 
 
 /* parses an expression */
@@ -259,6 +281,9 @@ static void compiler_init(Compiler_t* compiler, VMData_t* data, const char* src,
     compiler->parser.panic_mode = false;
     compiler->chunk = chunk;
     compiler->vmdata = data;
+
+    compiler->local_count = 0;
+    compiler->scope_depth = 0;
 }
 
 
@@ -330,6 +355,12 @@ static void parse_precedence(Compiler_t* compiler, Precedence_t prec)
 
 
 
+
+
+
+
+
+
 static const ParseRule_t* get_parse_rule(TokenType_t type)
 {
     return &s_rules[type];
@@ -339,6 +370,13 @@ static const ParseRule_t* get_parse_rule(TokenType_t type)
 static size_t parse_variable(Compiler_t* compiler, const char* errmsg)
 {
     consume(compiler, TOKEN_IDENTIFIER, errmsg);
+
+    if (compiler->scope_depth > 0)
+    {
+        declare_local(compiler);
+        return 0; /* dummy value */
+    }
+
     return identifier_constant(compiler, compiler->parser.prev);
 }
 
@@ -353,9 +391,17 @@ static size_t identifier_constant(Compiler_t* compiler, const Token_t token)
 
 static void define_variable(Compiler_t* compiler, size_t global_index)
 {
+    if (compiler->scope_depth > 0)
+    {
+        return;
+    }
     emit_global(compiler, OP_DEFINE_GLOBAL, global_index);
 }
 
+
+static void declare_local(Compiler_t* compiler)
+{
+}
 
 
 
@@ -411,6 +457,12 @@ static void statement(Compiler_t* compiler)
     {
         stmt_print(compiler);
     }
+    else if (match(compiler, TOKEN_LEFT_BRACE))
+    {
+        scope_begin(compiler);
+        stmt_block(compiler);
+        scope_end(compiler);
+    }
     else 
     {
         stmt_expr(compiler);
@@ -434,6 +486,35 @@ static void stmt_print(Compiler_t* compiler)
     expression(compiler, false);
     consume(compiler, TOKEN_SEMICOLON, "Expeceted ';' after expression.");
     emit_byte(compiler, OP_PRINT);
+}
+
+
+
+
+
+
+
+static void scope_begin(Compiler_t* compiler)
+{
+    compiler->scope_depth += 1;
+}
+
+
+static void stmt_block(Compiler_t* compiler)
+{
+    while (!current_token_type(compiler, TOKEN_RIGHT_BRACE)
+        && !current_token_type(compiler, TOKEN_LEFT_BRACE))
+    {
+        declaration(compiler);
+    }
+
+    consume(compiler, TOKEN_RIGHT_BRACE, "Expected '}' after block.");
+}
+
+
+static void scope_end(Compiler_t* compiler)
+{
+    compiler->scope_depth -= 1;
 }
 
 
