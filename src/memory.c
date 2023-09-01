@@ -51,7 +51,7 @@ static void set_header(FreeHeader_t* header, size_t capacity, FreeHeader_t* next
 #define GET_HEADER(ptr) (FreeHeader_t*)(((uint8_t*)(ptr)) - sizeof(FreeHeader_t))
 #define GET_PTR(header_ptr) (((uint8_t*)(header_ptr)) + sizeof(FreeHeader_t))
 
-#define MIN_SIZE 16
+#define MIN_SIZE 8
 #define MIN_CAPACITY (MIN_SIZE + sizeof(FreeHeader_t))
 
 
@@ -66,7 +66,10 @@ void Allocator_Init(Allocator_t* allocator, bufsize_t initial_capacity)
 	if (NULL == allocator->head)
 	{
 		fprintf(stderr, 
-			"Cannot initialize allocator because malloc returned NULL, size requested: %llu\n", (uint64_t)initial_capacity);
+			"Cannot initialize allocator because malloc returned NULL, "
+            "size requested: %"PRIu64"\n", 
+            (uint64_t)initial_capacity
+        );
 		exit(EXIT_FAILURE);
 	}
 
