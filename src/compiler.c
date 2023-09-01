@@ -596,7 +596,7 @@ static void scope_begin(Compiler_t* compiler)
 static void stmt_block(Compiler_t* compiler)
 {
     while (!current_token_type(compiler, TOKEN_RIGHT_BRACE)
-        && !current_token_type(compiler, TOKEN_LEFT_BRACE))
+        && !current_token_type(compiler, TOKEN_EOF))
     {
         declaration(compiler);
     }
