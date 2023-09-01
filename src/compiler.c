@@ -47,14 +47,14 @@ typedef struct Local_t
 
 typedef struct Compiler_t
 {
-    Scanner_t scanner;
-    Parser_t parser;
     Chunk_t* chunk;
     VMData_t* vmdata;
+    Scanner_t scanner;
+    Parser_t parser;
     
-    Local_t locals[UINT8_COUNT];
     int local_count;
     int scope_depth;
+    Local_t locals[UINT8_COUNT];
 } Compiler_t;
 
 
@@ -985,6 +985,7 @@ static void synchronize(Compiler_t* compiler)
             case TOKEN_WHILE:
             case TOKEN_PRINT:
             case TOKEN_RETURN:
+            case TOKEN_RIGHT_BRACE:
                 return;
 
             default: break; // Do nothing.
