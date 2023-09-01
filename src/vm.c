@@ -142,13 +142,13 @@ do{\
     {
 
 #ifdef DEBUG_TRACE_EXECUTION
-        printf("          ");
+        fprintf(stderr, "          ");
         for (Value_t* slot = vm->stack; slot < vm->sp; slot++) {
-            printf("[ ");
+            fprintf(stderr, "[ ");
             Value_Print(stderr, *slot);
-            printf(" ]");
+            fprintf(stderr, " ]");
         }
-        printf("\n");
+        fprintf(stderr, "\n");
         Disasm_Instruction(stderr, vm->chunk, vm->ip - vm->chunk->code);
 #endif /* DEBUG_TRACE_EXECUTION */
 
