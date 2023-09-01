@@ -69,7 +69,7 @@ void Value_Print(FILE* fout, Value_t val)
 	case VAL_BOOL:		fprintf(fout, AS_BOOL(val) ? "true" : "false"); break;
 	case VAL_NIL:		fprintf(fout, "nil"); break;
 	case VAL_NUMBER:	fprintf(fout, "'%g'", AS_NUMBER(val)); break;
-	case VAL_OBJ:		Obj_Print(val); break;
+	case VAL_OBJ:		Obj_Print(fout, val); break;
 	default: CLOX_ASSERT(false && "Unhandled Value_Print() case."); return;
 	}
 }

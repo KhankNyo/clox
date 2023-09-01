@@ -152,12 +152,12 @@ ObjString_t* ObjStr_Steal(VMData_t* vmdata, char* heapstr, int len)
 #endif /* OBJSTR_FLEXIBLE_ARR */
 
 
-void Obj_Print(const Value_t val)
+void Obj_Print(FILE* fout, const Value_t val)
 {
     switch (OBJ_TYPE(val))
     {
     case OBJ_STRING:
-        printf("%s", AS_CSTR(val));
+        fprintf(fout, "%s", AS_CSTR(val));
         break;
     default: CLOX_ASSERT(false && "Unhandled Obj_Print() case"); break;
     }

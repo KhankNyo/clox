@@ -88,8 +88,8 @@ uint32_t ObjStr_HashStrs(int count, const ObjString_t* strings[static count]);
 #endif /* OBJSTR_FLEXIBLE_ARR */
 
 
-/* prints a val to stdout */
-void Obj_Print(const Value_t val);
+/* prints a val to fout stream */
+void Obj_Print(FILE* fout, const Value_t val);
 
 
 
