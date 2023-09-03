@@ -24,7 +24,6 @@ typedef struct Parser_t
 typedef enum Precedence_t {
     PREC_NONE = 0,
     PREC_ASSIGNMENT,  // =
-                      // emit_global(compiler, OP_DEFINE_GLOBAL, global_index);
     PREC_OR,          // or
     PREC_AND,         // and
     PREC_EQUALITY,    // == !=
@@ -120,10 +119,10 @@ static void decl_var(Compiler_t* compiler);
 static void statement(Compiler_t* compiler);
 static void stmt_expr(Compiler_t* compiler);
 static void stmt_print(Compiler_t* compiler);
-
-static void scope_begin(Compiler_t* compiler);
+static void stmt_if(Compiler_t* compiler);
+    static void scope_begin(Compiler_t* compiler);
 static void stmt_block(Compiler_t* compiler);
-static void scope_end(Compiler_t* compiler);
+    static void scope_end(Compiler_t* compiler);
 
 
 
@@ -160,6 +159,10 @@ static void emit_return(Compiler_t* compiler);
 
 /* pushes a constant into the constant table */
 static size_t emit_constant(Compiler_t* compiler, Value_t val);
+
+/**/
+static size_t emit_jump(Compiler_t* compiler, Opc_t jump_op);
+static void patch_jump(Compiler_t* compiler, size_t starting);
 
 
 
@@ -550,6 +553,10 @@ static void statement(Compiler_t* compiler)
     {
         stmt_print(compiler);
     }
+    else if (match(compiler, TOKEN_IF))
+    {
+        stmt_if(compiler);
+    }
     else if (match(compiler, TOKEN_LEFT_BRACE))
     {
         scope_begin(compiler);
@@ -582,8 +589,40 @@ static void stmt_print(Compiler_t* compiler)
 }
 
 
+static void stmt_if(Compiler_t* compiler)
+{
+    consume(compiler, TOKEN_LEFT_PAREN, "Expected '(' after 'if'.");
+    expression(compiler, false);
+    consume(compiler, TOKEN_RIGHT_PAREN, "Expected ')' after expression.");
 
-
+    /*
+     * psh 
+     * jf l1
+     *  pop
+     *  .. stuff ..
+     *  jmp l3
+     * l1:
+     *   pop 
+     *   psh  
+     *   jf l3
+     *   pop 
+     *   .. stuff ..
+     * l3:
+     *   pop 
+     *
+     * */
+    size_t skip_if = emit_jump(compiler, OP_JUMP_IF_FALSE);
+        emit_byte(compiler, OP_POP);
+        statement(compiler);
+    size_t done_if = emit_jump(compiler, OP_JUMP);
+    patch_jump(compiler, skip_if);
+        emit_byte(compiler, OP_POP);
+        if (match(compiler, TOKEN_ELSE))
+        {
+            statement(compiler);
+        }
+    patch_jump(compiler, done_if);
+}
 
 
 
@@ -812,6 +851,10 @@ static void emit_global(Compiler_t* compiler, Opc_t opcode, size_t addr)
     {
         emit_2_bytes(compiler, opcode, addr);
     }
+    else if (opcode == OP_SET_LOCAL || opcode == OP_GET_LOCAL)
+    {
+        error(&compiler->parser, "Cannot have more than 256 variables in scope.");
+    }
     else 
     {
         emit_bytes(compiler, 4, 
@@ -824,13 +867,11 @@ static void emit_global(Compiler_t* compiler, Opc_t opcode, size_t addr)
 }
 
 
-
-
-
 static void emit_return(Compiler_t* compiler)
 {
     emit_byte(compiler, OP_RETURN);
 }
+
 
 static size_t emit_constant(Compiler_t* compiler, Value_t val)
 {
@@ -843,6 +884,32 @@ static size_t emit_constant(Compiler_t* compiler, Value_t val)
     }
     return val_addr;
 }
+
+
+static size_t emit_jump(Compiler_t* compiler, Opc_t jump_ins)
+{
+    emit_bytes(compiler, 3, 
+        jump_ins, 0xff, 0xff
+    );
+    return current_chunk(compiler)->size - 2; /* where the jump instruction is */
+}
+
+
+static void patch_jump(Compiler_t* compiler, size_t start)
+{
+    unsigned offset = current_chunk(compiler)->size - (start + 2);
+    if (offset > UINT16_MAX)
+    {
+        error(&compiler->parser, "Too much code in an if statement.");
+        return;
+    }
+
+    current_chunk(compiler)->code[start + 0] = offset;
+    current_chunk(compiler)->code[start + 1] = offset >> 8;
+}
+
+
+
 
 
 

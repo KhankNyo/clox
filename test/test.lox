@@ -1,2 +1,10 @@
 
-print "Hello, world";
+
+
+if (true) print "br1";
+else print "UNREACHABLE";
+
+if (false) print "UNREACHABLE2";
+else if (false) print "UNREACHABLE3";
+
+print "done";

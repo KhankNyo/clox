@@ -24,7 +24,6 @@ static void str_concatenate(VM_t* vm);
 
 static void runtime_error(VM_t* vm, const char* fmt, ...);
 static void debug_trace_execution(const VM_t* vm);
-static uint32_t read_long(VM_t* vm);
 
 
 
@@ -135,16 +134,19 @@ static InterpretResult_t run(VM_t* vm)
 #define READ_CONSTANT() (vm->chunk->consts.vals[READ_BYTE()])
 
 
+#define READ_SHORT() \
+    (vm->ip += 2, (((uint16_t)vm->ip[-1] << 8) | vm->ip[-2]))
 
-#define READ_LONG() read_long(vm)
+    // my dear god 
+#define READ_LONG() \
+    (vm->ip += 3, (((uint32_t)vm->ip[-1] << 16) \
+                   | ((uint32_t)vm->ip[-2] << 8) \
+                   | vm->ip[-3]))
 #define READ_CONSTANT_LONG() (vm->chunk->consts.vals[READ_LONG()])
-
 
 
 #define READ_STR() AS_STR(READ_CONSTANT())
 #define READ_STR_LONG() AS_STR(READ_CONSTANT_LONG())
-
-
 
 
 #define GET_GLOBAL(macro_read_str) \
@@ -189,13 +191,14 @@ do{\
     while (true)
     {
         debug_trace_execution(vm);
+        CLOX_ASSERT(vm->sp >= &vm->stack[0]);
         uint8_t ins = READ_BYTE();
 
         switch (ins)
         {
 
         case OP_CONSTANT_LONG:  VM_Push(vm, READ_CONSTANT_LONG()); break;
-        case OP_CONSTANT:   VM_Push(vm, READ_CONSTANT()); break;
+        case OP_CONSTANT:       VM_Push(vm, READ_CONSTANT()); break;
 
         case OP_NEGATE:
             if (!IS_NUMBER(peek(vm, 0)))
@@ -273,23 +276,31 @@ do{\
         break;
 
 
-        case OP_SET_LOCAL:
-        {
-            uint8_t i = READ_BYTE();
-            vm->stack[i] = peek(vm, 0);
-        }
-        break;
-        case OP_GET_LOCAL:
-        {
-            uint8_t i = READ_BYTE();
-            VM_Push(vm, vm->stack[i]);
-        }
-        break;
+        case OP_SET_LOCAL: vm->stack[READ_BYTE()] = peek(vm, 0); break;
+        case OP_GET_LOCAL: VM_Push(vm, vm->stack[READ_BYTE()]); break;
 
         case OP_GET_GLOBAL_LONG:    GET_GLOBAL(READ_STR_LONG); break;
         case OP_GET_GLOBAL:         GET_GLOBAL(READ_STR); break;
         case OP_SET_GLOBAL_LONG:    SET_GLOBAL(READ_STR_LONG); break;
         case OP_SET_GLOBAL:         SET_GLOBAL(READ_STR); break;
+
+        case OP_JUMP:
+        {
+            uint16_t offset = READ_SHORT();
+            vm->ip += offset;
+        }
+        break;
+        case OP_JUMP_IF_FALSE:
+        {
+            uint16_t offset = READ_SHORT();
+            if (is_falsey(peek(vm, 0)))
+            {
+                vm->ip += offset;
+            }
+        }
+        break;
+
+
         
         default: break;
         }
@@ -303,6 +314,7 @@ do{\
 #undef READ_STR_LONG
 #undef READ_BYTE
 #undef READ_LONG
+#undef READ_SHORT
 }
 
 
@@ -402,16 +414,6 @@ static void debug_trace_execution(const VM_t* vm)
     (void)vm;
 #endif /* DEBUG_TRACE_EXECUTION */
 }
-
-
-static uint32_t read_long(VM_t* vm)
-{
-    uint32_t operand = *vm->ip++;
-    operand |= ((uint32_t)*vm->ip++) << 8;
-    operand |= ((uint32_t)*vm->ip++) << 16;
-    return operand;
-}
-
 
 
 
