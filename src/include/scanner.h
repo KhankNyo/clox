@@ -38,6 +38,10 @@ typedef enum TokenType_t
     TOKEN_TRUE, TOKEN_VAR, TOKEN_WHILE,
 
     TOKEN_ERROR, TOKEN_EOF,
+
+    // extensions
+    TOKEN_PLUS_EQUAL, TOKEN_MINUS_EQUAL,
+    TOKEN_SLASH_EQUAL, TOKEN_STAR_EQUAL,
 } TokenType_t;
 
 
