@@ -206,7 +206,7 @@ static size_t const_instruction(FILE* fout,
 	size_t const_addr = 0;
 	for (unsigned i = 0; i < addr_size; i++)
 	{
-		const_addr |= (size_t)chunk->code[offset + 1 + i] << 8*i;
+		const_addr |= (size_t)chunk->code[offset + 1 + i] << (addr_size - i - 1)*8;
 	}
 
 	fprintf(fout, INS_FMTSTR"%4zu ", mnemonic, const_addr);
@@ -224,7 +224,7 @@ static size_t bytes_instruction(FILE* fout,
     uint64_t operand = 0;
     for (unsigned i = 0; i < arg_size; i++)
     {
-        operand |= (uint64_t)chunk->code[offset + i + 1] << i*8;
+        operand |= (uint64_t)chunk->code[offset + i + 1] << (arg_size - i - 1)*8;
     }
     fprintf(fout, INS_FMTSTR"%4llu", mnemonic, operand);
     return offset + 1 + arg_size;
@@ -236,8 +236,8 @@ static size_t jump_instruction(FILE* fout,
 )
 {
     uint16_t jump_offset = 
-        ((uint16_t)chunk->code[offset + 2] << 8)
-        | chunk->code[offset + 1];
+        ((uint16_t)chunk->code[offset + 1] << 8)
+        | chunk->code[offset + 2];
 
     fprintf(fout, INS_FMTSTR"%4d -> %zu", mnemonic, jump_offset,
         offset + 3 + sign * jump_offset

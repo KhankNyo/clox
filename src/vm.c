@@ -135,13 +135,13 @@ static InterpretResult_t run(VM_t* vm)
 
 
 #define READ_SHORT() \
-    (vm->ip += 2, (((uint16_t)vm->ip[-1] << 8) | vm->ip[-2]))
+    (vm->ip += 2, (((uint16_t)vm->ip[-2] << 8) | vm->ip[-1]))
 
     // my dear god 
 #define READ_LONG() \
-    (vm->ip += 3, (((uint32_t)vm->ip[-1] << 16) \
+    (vm->ip += 3, (((uint32_t)vm->ip[-3] << 16) \
                    | ((uint32_t)vm->ip[-2] << 8) \
-                   | vm->ip[-3]))
+                   | vm->ip[-1]))
 #define READ_CONSTANT_LONG() (vm->chunk->consts.vals[READ_LONG()])
 
 

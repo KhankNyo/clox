@@ -123,23 +123,24 @@ static void stmt_if(Compiler_t* compiler);
     static void scope_begin(Compiler_t* compiler);
 static void stmt_block(Compiler_t* compiler);
     static void scope_end(Compiler_t* compiler);
-
+static void stmt_while(Compiler_t* compiler);
 
 
 
 /* parses an expression */
 static void expression(Compiler_t* compiler, bool can_assign);
 
-static void string(Compiler_t* copmiler, bool can_assign);
+static void string(Compiler_t* compiler, bool can_assign);
 static void literal(Compiler_t* compiler, bool can_assign);
 static void number(Compiler_t* compiler, bool can_assign);
 static void grouping(Compiler_t* compiler, bool can_assign);
 static void unary(Compiler_t* compiler, bool can_assign);
 static void binary(Compiler_t* compiler, bool can_assign);
 static void variable(Compiler_t* compiler, bool can_assign);
-
 /* get or set a variable with the given name */
 static void named_variable(Compiler_t* compiler, const Token_t name, bool can_assign);
+static void and_(Compiler_t* compiler, bool can_assign);
+static void or_(Compiler_t* compiler, bool can_assign);
 
 
 
@@ -160,9 +161,12 @@ static void emit_return(Compiler_t* compiler);
 /* pushes a constant into the constant table */
 static size_t emit_constant(Compiler_t* compiler, Value_t val);
 
-/**/
+/* emits a jump instruction, return the starting location of its operand */
 static size_t emit_jump(Compiler_t* compiler, Opc_t jump_op);
-static void patch_jump(Compiler_t* compiler, size_t starting);
+static void patch_jump(Compiler_t* compiler, size_t start);
+
+static void emit_loop(Compiler_t* compiler, size_t loop_head);
+
 
 
 
@@ -229,7 +233,7 @@ static const ParseRule_t s_rules[] =
   [TOKEN_IDENTIFIER]    = {variable, NULL,   PREC_NONE},
   [TOKEN_STRING]        = {string,   NULL,   PREC_NONE},
   [TOKEN_NUMBER]        = {number,   NULL,   PREC_NONE},
-  [TOKEN_AND]           = {NULL,     NULL,   PREC_NONE},
+  [TOKEN_AND]           = {NULL,     and_,   PREC_AND},
   [TOKEN_CLASS]         = {NULL,     NULL,   PREC_NONE},
   [TOKEN_ELSE]          = {NULL,     NULL,   PREC_NONE},
   [TOKEN_FALSE]         = {literal,  NULL,   PREC_NONE},
@@ -237,7 +241,7 @@ static const ParseRule_t s_rules[] =
   [TOKEN_FUN]           = {NULL,     NULL,   PREC_NONE},
   [TOKEN_IF]            = {NULL,     NULL,   PREC_NONE},
   [TOKEN_NIL]           = {literal,  NULL,   PREC_NONE},
-  [TOKEN_OR]            = {NULL,     NULL,   PREC_NONE},
+  [TOKEN_OR]            = {NULL,     or_,    PREC_OR},
   [TOKEN_PRINT]         = {NULL,     NULL,   PREC_NONE},
   [TOKEN_RETURN]        = {NULL,     NULL,   PREC_NONE},
   [TOKEN_SUPER]         = {NULL,     NULL,   PREC_NONE},
@@ -553,6 +557,10 @@ static void statement(Compiler_t* compiler)
     {
         stmt_print(compiler);
     }
+    else if (match(compiler, TOKEN_WHILE))
+    {
+        stmt_while(compiler);
+    }
     else if (match(compiler, TOKEN_IF))
     {
         stmt_if(compiler);
@@ -659,6 +667,26 @@ static void scope_end(Compiler_t* compiler)
 
     emit_2_bytes(compiler, OP_POPN, popped_vars);
 }
+
+
+static void stmt_while(Compiler_t* compiler)
+{
+    size_t loop_begin = current_chunk(compiler)->size;
+
+        consume(compiler, TOKEN_LEFT_PAREN, "Expected '(' after 'while'.");
+        expression(compiler, false);
+        consume(compiler, TOKEN_RIGHT_PAREN, "Expected ')' after expression.");
+
+    size_t skip_while = emit_jump(compiler, OP_JUMP_IF_FALSE);
+            emit_byte(compiler, OP_POP);
+            statement(compiler);
+    emit_loop(compiler, loop_begin);
+
+    patch_jump(compiler, skip_while);
+    emit_byte(compiler, OP_POP);
+}
+
+
 
 
 
@@ -813,6 +841,32 @@ static void named_variable(Compiler_t* compiler, const Token_t name, bool can_as
 
 
 
+static void and_(Compiler_t* compiler, bool can_assign)
+{
+    (void)can_assign;
+
+    /* LHS already compiled */
+    size_t skip_right = emit_jump(compiler, OP_JUMP_IF_FALSE);
+        emit_byte(compiler, OP_POP);
+        parse_precedence(compiler, PREC_AND);
+    patch_jump(compiler, skip_right);
+}
+
+
+static void or_(Compiler_t* compiler, bool can_assign)
+{
+    (void)can_assign;
+
+    size_t continue_or = emit_jump(compiler, OP_JUMP_IF_FALSE);
+    size_t skip_or = emit_jump(compiler, OP_JUMP);
+    patch_jump(compiler, continue_or);
+        emit_byte(compiler, OP_POP);
+        parse_precedence(compiler, PREC_OR);
+    patch_jump(compiler, skip_or);
+    /* result on stack */
+}
+
+
 
 
 
@@ -859,9 +913,9 @@ static void emit_global(Compiler_t* compiler, Opc_t opcode, size_t addr)
     {
         emit_bytes(compiler, 4, 
             opcode | 0x80,
-            addr,
+            addr >> 16,
             addr >> 8,
-            addr >> 16
+            addr >> 0
         );
     }
 }
@@ -891,7 +945,7 @@ static size_t emit_jump(Compiler_t* compiler, Opc_t jump_ins)
     emit_bytes(compiler, 3, 
         jump_ins, 0xff, 0xff
     );
-    return current_chunk(compiler)->size - 2; /* where the jump instruction is */
+    return current_chunk(compiler)->size - 2; /* where its operand is */
 }
 
 
@@ -904,10 +958,24 @@ static void patch_jump(Compiler_t* compiler, size_t start)
         return;
     }
 
-    current_chunk(compiler)->code[start + 0] = offset;
-    current_chunk(compiler)->code[start + 1] = offset >> 8;
+    current_chunk(compiler)->code[start + 0] = offset >> 8;
+    current_chunk(compiler)->code[start + 1] = offset;
 }
 
+
+static void emit_loop(Compiler_t* compiler, size_t loop_head)
+{
+    emit_byte(compiler, OP_LOOP);
+    uint16_t offset = (current_chunk(compiler)->size + 2) - loop_head;
+
+    if (offset > UINT16_MAX)
+    {
+        error(&compiler->parser, "Loop body too large.");
+        return;
+    }
+
+    emit_2_bytes(compiler, offset >> 8, offset);
+}
 
 
 
