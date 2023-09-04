@@ -175,6 +175,10 @@ size_t Disasm_Instruction(FILE* fout, const Chunk_t* chunk, size_t offset)
         offset = jump_instruction(fout, "OP_JUMP_IF_FALSE", 1, chunk, offset);
         break;
 
+    case OP_LOOP:
+        offset = jump_instruction(fout, "OP_LOOP", -1, chunk, offset);
+        break;
+
 
 
 	default:

@@ -124,11 +124,12 @@ static void stmt_if(Compiler_t* compiler);
 static void stmt_block(Compiler_t* compiler);
     static void scope_end(Compiler_t* compiler);
 static void stmt_while(Compiler_t* compiler);
+static void stmt_for(Compiler_t* compiler);
 
 
 
 /* parses an expression */
-static void expression(Compiler_t* compiler, bool can_assign);
+static void expression(Compiler_t* compiler);
 
 static void string(Compiler_t* compiler, bool can_assign);
 static void literal(Compiler_t* compiler, bool can_assign);
@@ -534,7 +535,7 @@ static void decl_var(Compiler_t* compiler)
 
     if (match(compiler, TOKEN_EQUAL))
     {
-        expression(compiler, true);
+        expression(compiler);
     }
     else 
     {
@@ -556,6 +557,10 @@ static void statement(Compiler_t* compiler)
     if (match(compiler, TOKEN_PRINT))
     {
         stmt_print(compiler);
+    }
+    else if (match(compiler, TOKEN_FOR))
+    {
+        stmt_for(compiler);
     }
     else if (match(compiler, TOKEN_WHILE))
     {
@@ -583,7 +588,7 @@ static void statement(Compiler_t* compiler)
 
 static void stmt_expr(Compiler_t* compiler)
 {
-    expression(compiler, false);
+    expression(compiler);
     consume(compiler, TOKEN_SEMICOLON, "Expect ';' after expression.");
     emit_byte(compiler, OP_POP);
 }
@@ -591,7 +596,7 @@ static void stmt_expr(Compiler_t* compiler)
 
 static void stmt_print(Compiler_t* compiler)
 {
-    expression(compiler, false);
+    expression(compiler);
     consume(compiler, TOKEN_SEMICOLON, "Expeceted ';' after expression.");
     emit_byte(compiler, OP_PRINT);
 }
@@ -600,24 +605,23 @@ static void stmt_print(Compiler_t* compiler)
 static void stmt_if(Compiler_t* compiler)
 {
     consume(compiler, TOKEN_LEFT_PAREN, "Expected '(' after 'if'.");
-    expression(compiler, false);
+    expression(compiler);
     consume(compiler, TOKEN_RIGHT_PAREN, "Expected ')' after expression.");
 
     /*
-     * psh 
-     * jf l1
+     * expr  
+     * jif l1
      *  pop
-     *  .. stuff ..
+     *  .. stmt ..
      *  jmp l3
      * l1:
      *   pop 
-     *   psh  
-     *   jf l3
+     *   expr  
+     *   jif l3
      *   pop 
-     *   .. stuff ..
+     *   .. stmt ..
      * l3:
      *   pop 
-     *
      * */
     size_t skip_if = emit_jump(compiler, OP_JUMP_IF_FALSE);
         emit_byte(compiler, OP_POP);
@@ -674,7 +678,7 @@ static void stmt_while(Compiler_t* compiler)
     size_t loop_begin = current_chunk(compiler)->size;
 
         consume(compiler, TOKEN_LEFT_PAREN, "Expected '(' after 'while'.");
-        expression(compiler, false);
+        expression(compiler);
         consume(compiler, TOKEN_RIGHT_PAREN, "Expected ')' after expression.");
 
     size_t skip_while = emit_jump(compiler, OP_JUMP_IF_FALSE);
@@ -687,17 +691,95 @@ static void stmt_while(Compiler_t* compiler)
 }
 
 
-
-
-
-
-
-
-
-
-static void expression(Compiler_t* compiler, bool can_assign)
+static void stmt_for(Compiler_t* compiler)
 {
-    (void)can_assign;
+    /*
+     *  mamma mia la spaghetti
+     *  loop_head:
+     *    expr 
+     *    jif loop_end
+     *    pop
+     *    jmp loop_body
+     *  loop_inc:
+     *    expr 
+     *    pop 
+     *    jmp loop_head
+     *  loop_body:
+     *      .. stmt .. 
+     *    jmp loop_inc  
+     *  loop_end:
+     */
+    scope_begin(compiler);
+    {
+        consume(compiler, TOKEN_LEFT_PAREN, "Expected '(' after 'for'.");
+        /* intialization statement */
+        if (match(compiler, TOKEN_SEMICOLON))
+        {
+            /* no intiializer */
+        }
+        else if (match(compiler, TOKEN_VAR))
+        {
+            decl_var(compiler);
+        }
+        else 
+        {
+            stmt_expr(compiler);
+        }
+
+
+        /* condition statement */
+        size_t loop_head = current_chunk(compiler)->size;
+        size_t exit_jump = (size_t)-1;
+        if (!match(compiler, TOKEN_SEMICOLON))
+        {
+            expression(compiler);
+            consume(compiler, TOKEN_SEMICOLON, "Expected ';' after expression.");
+            exit_jump = emit_jump(compiler, OP_JUMP_IF_FALSE);
+            emit_byte(compiler, OP_POP);
+        }
+
+
+        /* inc/dec expression */
+        size_t increment_start = loop_head;
+        if (!match(compiler, TOKEN_RIGHT_PAREN))
+        {
+            size_t to_body = emit_jump(compiler, OP_JUMP);
+            increment_start = current_chunk(compiler)->size;
+            expression(compiler);
+            emit_byte(compiler, OP_POP); 
+            consume(compiler, TOKEN_RIGHT_PAREN, "Expected ')' after expression.");
+
+            emit_loop(compiler, loop_head); /* goes to condition statement */
+            loop_head = increment_start;
+            patch_jump(compiler, to_body);
+        }
+
+        
+        /* loop body */
+        statement(compiler);
+        emit_loop(compiler, increment_start);
+
+        /* exit location */
+        if (exit_jump != (size_t)-1)
+        {
+            patch_jump(compiler, exit_jump);
+            emit_byte(compiler, OP_POP);
+        }
+    }
+    scope_end(compiler);
+}
+
+
+
+
+
+
+
+
+
+
+static void expression(Compiler_t* compiler)
+{
     parse_precedence(compiler, PREC_ASSIGNMENT);
 }
 
@@ -742,8 +824,9 @@ static void number(Compiler_t* compiler, bool can_assign)
 
 static void grouping(Compiler_t* compiler, bool can_assign)
 {
+    (void)can_assign;
     /* assumes that '(' is already consumed */
-    expression(compiler, can_assign);
+    expression(compiler);
     consume(compiler, TOKEN_RIGHT_PAREN, "Expected ')' after expression.");
 }
 
@@ -829,7 +912,7 @@ static void named_variable(Compiler_t* compiler, const Token_t name, bool can_as
     if (can_assign && match(compiler, TOKEN_EQUAL))
     {
         /* compiles initializer */
-        expression(compiler, can_assign);
+        expression(compiler);
         emit_global(compiler, set_op, (unsigned)arg);
     }
     else 
@@ -951,7 +1034,7 @@ static size_t emit_jump(Compiler_t* compiler, Opc_t jump_ins)
 
 static void patch_jump(Compiler_t* compiler, size_t start)
 {
-    unsigned offset = current_chunk(compiler)->size - (start + 2);
+    uint32_t offset = current_chunk(compiler)->size - (start + 2);
     if (offset > UINT16_MAX)
     {
         error(&compiler->parser, "Too much code in an if statement.");
@@ -966,7 +1049,7 @@ static void patch_jump(Compiler_t* compiler, size_t start)
 static void emit_loop(Compiler_t* compiler, size_t loop_head)
 {
     emit_byte(compiler, OP_LOOP);
-    uint16_t offset = (current_chunk(compiler)->size + 2) - loop_head;
+    uint32_t offset = (current_chunk(compiler)->size + 2) - loop_head;
 
     if (offset > UINT16_MAX)
     {

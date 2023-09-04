@@ -36,6 +36,7 @@ typedef enum Opc_t
     OP_PRINT,
     OP_JUMP,
     OP_JUMP_IF_FALSE,
+    OP_LOOP,
 	OP_RETURN,
 
 
