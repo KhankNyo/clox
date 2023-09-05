@@ -11,6 +11,7 @@
 #include "include/debug.h"
 #include "include/object.h"
 #include "include/memory.h"
+#include "include/natives.h"
 
 
 
@@ -51,6 +52,8 @@ void VM_Init(VM_t* vm, Allocator_t* alloc)
     stack_reset(vm);
     Table_Init(&vm->data.strings, alloc);
     Table_Init(&vm->data.globals, alloc);
+
+    VM_DefineNative(vm, "clock", Native_Clock);
 }
 
 
@@ -79,7 +82,7 @@ bool VM_Push(VM_t* vm, Value_t val)
 {
     if (vm->sp >= &vm->stack[VM_STACK_MAX])
     {
-        runtime_error(vm, "Out of stack memory.");
+        runtime_error(vm, "Stack overflow.");
         return false;
     }
     *vm->sp = val;
@@ -90,7 +93,7 @@ bool VM_Push(VM_t* vm, Value_t val)
 
 Value_t VM_Pop(VM_t* vm)
 {
-    CLOX_ASSERT(vm->sp > vm->stack);
+    CLOX_ASSERT(vm->sp >= vm->stack);
     vm->sp--;
     return *vm->sp;
 }
@@ -118,20 +121,9 @@ InterpretResult_t VM_Interpret(VM_t* vm, const char* src)
     if (NULL == fun)
         return INTERPRET_COMPILE_ERROR;
 
-
     VM_Push(vm, OBJ_VAL(fun));
-    CLOX_ASSERT(vm->frame_count == 0);
-    /* pushes the script onto the call frame */
     call(vm, fun, 0);
-
-
-    InterpretResult_t ret = run(vm);
-    /* vm keeps a reference of fun in its vmdata, 
-     * it will be freed when VM_Free is called */
-    CLOX_ASSERT(vm->sp == &vm->stack[1]);
-    pop_cf(vm);
-    VM_Pop(vm);
-    return ret;
+    return run(vm);
 }
 
 
@@ -164,7 +156,7 @@ void VM_FreeObjs(VM_t* vm)
 static InterpretResult_t run(VM_t* vm)
 {
     CLOX_ASSERT(vm->frame_count > 0);
-    CallFrame_t* current = &vm->frames[vm->frame_count - 1];
+    CallFrame_t* current = peek_cf(vm, 0);
 
 #define READ_BYTE() (*current->ip++)
 #define READ_CONSTANT() (current->fun->chunk.consts.vals[READ_BYTE()])
@@ -408,12 +400,13 @@ do{\
 static void stack_reset(VM_t* vm)
 {
     vm->sp = &vm->stack[0];
+    vm->frame_count = 0;
 }
 
 
 static Value_t peek(const VM_t* vm, int offset)
 {
-#warning "peek is unsafe, refactor it"
+#pragma warning("peek is unsafe, refactor it")
     return vm->sp[-1 - offset];
 }
 
@@ -481,9 +474,8 @@ static void runtime_error(VM_t* vm, const char* fmt, ...)
     fputc('\n', stderr);
 
     CLOX_ASSERT(vm->frame_count > 0);
-    CallFrame_t* current = &vm->frames[vm->frame_count - 1];
-
     trace_cf(vm);
+
     stack_reset(vm);
 }
 
@@ -514,29 +506,20 @@ static bool push_cf(VM_t* vm, ObjFunction_t* fun, int argc)
 {
     if (vm->frame_count >= VM_FRAMES_MAX)
     {
-        runtime_error(vm, "Possible duplicate, already an answer.");
+        runtime_error(vm, "Stack overflow.");
         return false;
     }
 
-    CLOX_ASSERT(vm->frame_count != 0);
-    
-    uint8_t* ip = peek_cf(vm, 0)->ip;
-    vm->frames[vm->frame_count++] = (CallFrame_t){
-        .fun = fun,
-        .ip = ip,
-        .base = vm->sp - argc,
-    };
+    CallFrame_t* current = &vm->frames[vm->frame_count++];
+    current->fun = fun;
+    current->ip = fun->chunk.code;
+    current->base = vm->sp - argc - 1;
     return true;
 }
 
 static CallFrame_t* pop_cf(VM_t* vm)
 {
-    if (vm->frame_count <= 0)
-    {
-        runtime_error(vm, "Cannot return from top level code.");
-        return NULL;
-    }
-
+    CLOX_ASSERT(vm->frame_count > 0);
     vm->frame_count -= 1;
     return &vm->frames[vm->frame_count];
 }

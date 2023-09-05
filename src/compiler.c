@@ -239,7 +239,7 @@ static void synchronize(Compiler_t* compiler);
 
 static const ParseRule_t s_rules[] = 
 {
-  [TOKEN_LEFT_PAREN]    = {grouping, call,   NULL,   PREC_NONE},
+  [TOKEN_LEFT_PAREN]    = {grouping, call,   NULL,   PREC_CALL},
   [TOKEN_RIGHT_PAREN]   = {NULL,     NULL,   NULL,   PREC_NONE},
   [TOKEN_LEFT_BRACE]    = {NULL,     NULL,   NULL,   PREC_NONE}, 
   [TOKEN_RIGHT_BRACE]   = {NULL,     NULL,   NULL,   PREC_NONE},
@@ -348,6 +348,7 @@ static void compiler_init(Compiler_t* compiler, VMData_t* data, const char* src,
     compiler->parser.panic_mode = false;
     compiler->vmdata = data;
     compiler->data = NULL;
+
     compdat_init(compiler, compdat, TYPE_SCRIPT);
 }
 
@@ -377,11 +378,16 @@ static void compdat_init(Compiler_t* compiler, CompilerData_t* compdat, Function
             compiler->parser.prev.len
         );
     }
-
     compdat->funtype = type;
 
+
     compdat->scope_depth = 0;
-    compdat->local_count = 0;
+    compdat->local_count = 2;
+    compdat->locals[0] = (Local_t){
+        .name.start = "",
+        .name.len = 0,
+        .depth = 0,
+    };
 }
 
 
@@ -476,11 +482,9 @@ static size_t parse_variable(Compiler_t* compiler, const char* errmsg)
 {
     consume(compiler, TOKEN_IDENTIFIER, errmsg);
 
+    declare_local(compiler);
     if (compiler->data->scope_depth > 0)
-    {
-        declare_local(compiler);
         return 0; /* dummy value */
-    }
 
     return identifier_constant(compiler, compiler->parser.prev);
 }
@@ -546,8 +550,10 @@ static void define_variable(Compiler_t* compiler, size_t global_index)
 
 static void declare_local(Compiler_t* compiler)
 {
-    Token_t* name = &compiler->parser.prev;
+    if (compiler->data->scope_depth == 0) 
+        return;
 
+    Token_t* name = &compiler->parser.prev;
     for (int i = compiler->data->local_count - 1; i >= 0; i++)
     {
         Local_t* local = &compiler->data->locals[i];
@@ -726,7 +732,7 @@ static void stmt_expr(Compiler_t* compiler)
 static void stmt_print(Compiler_t* compiler)
 {
     expression(compiler);
-    consume(compiler, TOKEN_SEMICOLON, "Expeceted ';' after expression.");
+    consume(compiler, TOKEN_SEMICOLON, "Expect ';' after expression.");
     emit_byte(compiler, OP_PRINT);
 }
 
@@ -1141,6 +1147,8 @@ static void assignment(Compiler_t* compiler, Opc_t set_op, Opc_t get_op, unsigne
 
 static void call(Compiler_t* compiler, bool can_assign)
 {
+    (void)can_assign;
+
     uint8_t argc = arglist(compiler);
     emit_2_bytes(compiler, OP_CALL, argc);
 }

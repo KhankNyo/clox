@@ -144,10 +144,10 @@ size_t Disasm_Instruction(FILE* fout, const Chunk_t* chunk, size_t offset)
 
 
     case OP_GET_LOCAL:
-        offset = const_instruction(fout, "OP_GET_LOCAL", chunk, offset, 1);
+        offset = byte_instruction(fout, "OP_GET_LOCAL", chunk, offset);
         break;
     case OP_SET_LOCAL:
-        offset = const_instruction(fout, "OP_SET_LOCAL", chunk, offset, 1);
+        offset = byte_instruction(fout, "OP_SET_LOCAL", chunk, offset);
         break;
 
 
