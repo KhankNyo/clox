@@ -10,6 +10,7 @@
 #include "include/compiler.h"
 #include "include/debug.h"
 #include "include/object.h"
+#include "include/vm.h"
 
 
 
@@ -71,6 +72,7 @@ typedef struct Compiler_t
     VMData_t* vmdata;
     Scanner_t scanner;
     Parser_t parser;
+
     CompilerData_t* data;
 } Compiler_t;
 
@@ -651,7 +653,7 @@ static void function(Compiler_t* compiler, FunctionType_t type)
     scope_begin(compiler);
     {
         consume(compiler, TOKEN_LEFT_PAREN, "Expected '(' after function name.");
-        if (!current_token_type(compiler, TOKEN_RIGHT_PAREN))
+        if (!match(compiler, TOKEN_RIGHT_PAREN))
         {
             do {
                 fundat.fun->arity += 1;

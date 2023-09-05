@@ -20,7 +20,7 @@
     do{                                                 \
         if (!(debug_expression))                        \
         {                                               \
-            fprintf(stderr, "file: %s, on line %d: %s", \
+            fprintf(stderr, "ASSERTION FAILED: file: %s, on line %d: %s", \
                 __FILE__, __LINE__, STR_EXPR(debug_expression));\
             abort();                                    \
         }                                               \

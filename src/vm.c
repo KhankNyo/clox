@@ -35,6 +35,7 @@ static void trace_cf(const VM_t* vm);
 
 static bool call_value(VM_t* vm, Value_t callee, int argc);
 static bool call(VM_t* vm, ObjFunction_t* fun, int argc);
+static bool call_native(VM_t* vm, ObjNativeFn_t* native, int argc);
 
 
 
@@ -53,7 +54,7 @@ void VM_Init(VM_t* vm, Allocator_t* alloc)
     Table_Init(&vm->data.strings, alloc);
     Table_Init(&vm->data.globals, alloc);
 
-    VM_DefineNative(vm, "clock", Native_Clock);
+    CLOX_ASSERT(VM_DefineNative(vm, "clock", Native_Clock, 0));
 }
 
 
@@ -100,15 +101,22 @@ Value_t VM_Pop(VM_t* vm)
 
 
 
-void VM_DefineNative(VM_t* vm, const char* name, NativeFn_t fn)
+bool VM_DefineNative(VM_t* vm, const char* name, NativeFn_t fn, uint8_t argc)
 {
-    VM_Push(vm, OBJ_VAL(ObjStr_Copy(&vm->data, name, strlen(name))));
-    VM_Push(vm, OBJ_VAL(ObjNFn_Create(&vm->data, fn)));
+    if (!VM_Push(vm, OBJ_VAL(ObjStr_Copy(&vm->data, name, strlen(name)))))
+        return false;
+    if (!VM_Push(vm, OBJ_VAL(ObjNFn_Create(&vm->data, fn, argc))))
+    {
+        VM_Pop(vm);
+        return false;
+    }
+
     Table_Set(&vm->data.globals, 
         AS_STR(peek(vm, 1)), peek(vm, 0)
     );
-    VM_Pop(vm);
-    VM_Pop(vm);
+
+    vm->sp -= 2;
+    return true;
 }
 
 
@@ -158,18 +166,19 @@ static InterpretResult_t run(VM_t* vm)
     CLOX_ASSERT(vm->frame_count > 0);
     CallFrame_t* current = peek_cf(vm, 0);
 
-#define READ_BYTE() (*current->ip++)
+#define GET_IP() (current->ip)
+#define READ_BYTE() (*GET_IP()++)
 #define READ_CONSTANT() (current->fun->chunk.consts.vals[READ_BYTE()])
 
 
 #define READ_SHORT() \
-    (current->ip += 2, (((uint16_t)current->ip[-2] << 8) | current->ip[-1]))
+    (GET_IP() += 2, (((uint16_t)GET_IP()[-2] << 8) | GET_IP()[-1]))
 
     // my dear god 
 #define READ_LONG() \
-    (current->ip += 3, (((uint32_t)current->ip[-3] << 16) \
-                   | ((uint32_t)current->ip[-2] << 8) \
-                   | current->ip[-1]))
+    (GET_IP() += 3, (((uint32_t)GET_IP()[-3] << 16) \
+                   | ((uint32_t)GET_IP()[-2] << 8) \
+                   | GET_IP()[-1]))
 #define READ_CONSTANT_LONG() (current->fun->chunk.consts.vals[READ_LONG()])
 
 
@@ -330,7 +339,7 @@ do{\
         case OP_JUMP:
         {
             uint16_t offset = READ_SHORT();
-            current->ip += offset;
+            GET_IP() += offset;
         }
         break;
         case OP_JUMP_IF_FALSE:
@@ -338,14 +347,14 @@ do{\
             uint16_t offset = READ_SHORT();
             if (is_falsey(peek(vm, 0)))
             {
-                current->ip += offset;
+                GET_IP() += offset;
             }
         }
         break;
         case OP_LOOP:
         {
             uint16_t offset = READ_SHORT();
-            current->ip -= offset;
+            GET_IP() -= offset;
         }
         break;
         case OP_CALL:
@@ -393,7 +402,7 @@ do{\
 #undef READ_LONG
 #undef READ_SHORT
 #undef PUSH
-#undef POP
+#undef GET_IP
 }
 
 
@@ -406,7 +415,7 @@ static void stack_reset(VM_t* vm)
 
 static Value_t peek(const VM_t* vm, int offset)
 {
-#pragma warning("peek is unsafe, refactor it")
+    CLOX_ASSERT(vm->sp >= vm->stack && "peek");
     return vm->sp[-1 - offset];
 }
 
@@ -506,7 +515,7 @@ static bool push_cf(VM_t* vm, ObjFunction_t* fun, int argc)
 {
     if (vm->frame_count >= VM_FRAMES_MAX)
     {
-        runtime_error(vm, "Stack overflow.");
+        runtime_error(vm, "Call Stack overflow.");
         return false;
     }
 
@@ -528,11 +537,7 @@ static CallFrame_t* pop_cf(VM_t* vm)
 
 static CallFrame_t* peek_cf(VM_t* vm, int offset)
 {
-    if (vm->frame_count - 1 - offset < 0)
-    {
-        runtime_error(vm, "Cannot call function.");
-        return NULL;
-    }
+    CLOX_ASSERT(vm->frame_count - 1 - offset >= 0);
     return &vm->frames[vm->frame_count - 1 - offset];
 }
 
@@ -576,22 +581,8 @@ static bool call_value(VM_t* vm, Value_t callee, int argc)
 
     switch (OBJ_TYPE(callee))
     {
-    case OBJ_NATIVE:
-    {
-        NativeFn_t native = AS_NATIVE(callee);
-        Value_t* argv = vm->sp - argc;
-
-        Value_t ret = native(argc, argv);
-
-        vm->sp -= argc;
-        VM_Push(vm, ret);
-        return true;
-    }
-    break;
-
-    case OBJ_FUNCTION:
-        return call(vm, AS_FUNCTION(callee), argc);
-
+    case OBJ_NATIVE: return call_native(vm, AS_NATIVE(callee), argc);
+    case OBJ_FUNCTION: return call(vm, AS_FUNCTION(callee), argc);
     default: break;
     }
 
@@ -611,6 +602,24 @@ static bool call(VM_t* vm, ObjFunction_t* fun, int argc)
     }
     return push_cf(vm, fun, argc + 1);
 }
+
+
+static bool call_native(VM_t* vm, ObjNativeFn_t* native, int argc)
+{
+    if (native->arity != argc)
+    {
+        runtime_error(vm, "Expected %d arguments, got %d instead.", native->arity, argc);
+        return false;
+    }
+
+    Value_t* base_args = vm->sp - argc;
+
+    Value_t ret = native->fn(argc, base_args);
+    vm->sp = base_args + 1;
+    vm->sp[-1] = ret;
+    return true;
+}
+
 
 
 

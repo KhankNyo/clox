@@ -18,7 +18,7 @@
 #define AS_STR(value)       ((ObjString_t*)AS_OBJ(value))
 #define AS_CSTR(value)      (AS_STR(value)->cstr)
 #define AS_FUNCTION(value)  ((ObjFunction_t*)AS_OBJ(value))
-#define AS_NATIVE(value)    (((ObjNativeFn_t*)AS_OBJ(value))->fn)
+#define AS_NATIVE(value)    (((ObjNativeFn_t*)AS_OBJ(value)))
 
 
 typedef enum ObjType_t
@@ -43,6 +43,7 @@ typedef struct ObjNativeFn_t
 {
     Obj_t obj;
 
+    int arity;
     NativeFn_t fn; /* this ain't fun */
 } ObjNativeFn_t;
 
@@ -80,9 +81,9 @@ void Obj_Free(Allocator_t* alloc, Obj_t* obj);
 
 
 /*
- *  Creates a new ObjNativeFn_t from a C function pointer 
+ *  Creates a new ObjNativeFn_t from a C function pointer and its arity (arg count) 
  */
-ObjNativeFn_t* ObjNFn_Create(VMData_t* vmdata, NativeFn_t fn);
+ObjNativeFn_t* ObjNFn_Create(VMData_t* vmdata, NativeFn_t fn, uint8_t arity);
 
 /*
  *  Creates a new ObjFunction_t, cleanup using Obj_Free()

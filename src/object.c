@@ -78,9 +78,11 @@ void Obj_Free(Allocator_t* alloc, Obj_t* obj)
 
 
 
-ObjNativeFn_t* ObjNFn_Create(VMData_t* vmdata, NativeFn_t fn)
+ObjNativeFn_t* ObjNFn_Create(VMData_t* vmdata, NativeFn_t fn, uint8_t arity)
 {
     ObjNativeFn_t* native = ALLOCATE_OBJ(vmdata, ObjNativeFn_t, OBJ_NATIVE);
+
+    native->arity = arity;
     native->fn = fn;
     return native;
 }

@@ -47,22 +47,31 @@ typedef enum InterpretResult_t
 } InterpretResult_t;
 
 
+
+
+
 /* initializes vm */
 void VM_Init(VM_t* vm, Allocator_t* alloc);
 /* free vm's data */
 void VM_Free(VM_t* vm);
 
 
-/* pushes a value onto the vm's stack */
+/* pushes a value onto the vm's stack 
+ *  \returns true on success, 
+ *  \returns false if the stack is full
+ */
 bool VM_Push(VM_t* vm, Value_t val);
 
 /* pops a value off the vm's stack */
 Value_t VM_Pop(VM_t* vm);
 
+
 /*
  *  defines a C function that can interface with clox
+ *  \returns true on success, 
+ *  \returns false on failure
  */
-void VM_DefineNative(VM_t* vm, const char* name, NativeFn_t fn);
+bool VM_DefineNative(VM_t* vm, const char* name, NativeFn_t fn, uint8_t argc);
 
 
 
