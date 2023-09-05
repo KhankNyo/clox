@@ -513,7 +513,7 @@ static bool push_cf(VM_t* vm, ObjFunction_t* fun, int argc)
     CallFrame_t* current = &vm->frames[vm->frame_count++];
     current->fun = fun;
     current->ip = fun->chunk.code;
-    current->base = vm->sp - argc - 1;
+    current->base = vm->sp - argc;
     return true;
 }
 

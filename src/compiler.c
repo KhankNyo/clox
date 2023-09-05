@@ -382,7 +382,7 @@ static void compdat_init(Compiler_t* compiler, CompilerData_t* compdat, Function
 
 
     compdat->scope_depth = 0;
-    compdat->local_count = 2;
+    compdat->local_count = 1;
     compdat->locals[0] = (Local_t){
         .name.start = "",
         .name.len = 0,
@@ -1160,11 +1160,11 @@ static uint8_t arglist(Compiler_t* compiler)
     if (!current_token_type(compiler, TOKEN_RIGHT_PAREN))
     {
         do {
+            expression(compiler);
             if (argc == MAX_ARGCOUNT)
             {
                 error(&compiler->parser, "Cannot have more than 255 arguments.");
             }
-            expression(compiler);
             argc += 1;
         } while (match(compiler, TOKEN_COMMA));
     }
