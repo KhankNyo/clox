@@ -207,6 +207,8 @@ static size_t const_instruction(FILE* fout,
 	const char* mnemonic, const Chunk_t* chunk, 
 	size_t offset, unsigned addr_size)
 {
+    CLOX_ASSERT(chunk->consts.vals != NULL);
+
 	size_t const_addr = 0;
 	for (unsigned i = 0; i < addr_size; i++)
 	{

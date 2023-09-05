@@ -12,6 +12,10 @@
 #include "include/object.h"
 
 
+
+
+#define MAX_ARGCOUNT 255
+
 typedef struct Parser_t
 {
     Token_t prev;
@@ -38,22 +42,36 @@ typedef enum Precedence_t {
 
 
 
+typedef enum FuntionType_t
+{
+    TYPE_FUNCTION = 0,
+    TYPE_SCRIPT,
+} FunctionType_t;
+
 typedef struct Local_t
 {
     Token_t name;
     int depth;
 } Local_t;
 
-typedef struct Compiler_t
+
+typedef struct CompilerData_t
 {
-    Chunk_t* chunk;
-    VMData_t* vmdata;
-    Scanner_t scanner;
-    Parser_t parser;
-    
+    struct CompilerData_t* next;
+    ObjFunction_t* fun;
+    FunctionType_t funtype;
+
     int local_count;
     int scope_depth;
     Local_t locals[UINT8_COUNT];
+} CompilerData_t;
+
+typedef struct Compiler_t
+{
+    VMData_t* vmdata;
+    Scanner_t scanner;
+    Parser_t parser;
+    CompilerData_t* data;
 } Compiler_t;
 
 
@@ -82,8 +100,10 @@ typedef struct ParseRule_t
 
 
 
-static void compiler_init(Compiler_t* compiler, VMData_t* data, const char* src, Chunk_t* chunk);
-static void compiler_end(Compiler_t* compiler);
+static void compiler_init(Compiler_t* compiler, VMData_t* data, const char* src, CompilerData_t* compdat);
+static ObjFunction_t* compiler_end(Compiler_t* compiler);
+static void compdat_init(Compiler_t* compiler, CompilerData_t* compdat, FunctionType_t type);
+static ObjFunction_t* compdat_end(Compiler_t* compiler, CompilerData_t* compdat);
 
 
 /* Pratt parser */
@@ -113,6 +133,8 @@ static void add_local(Compiler_t* compiler, const Token_t name);
 
 static void declaration(Compiler_t* compiler);
 static void decl_var(Compiler_t* compiler);
+static void decl_fun(Compiler_t* compiler);
+static void function(Compiler_t* compiler, FunctionType_t type);
 
 
 
@@ -126,6 +148,7 @@ static void stmt_block(Compiler_t* compiler);
     static void scope_end(Compiler_t* compiler);
 static void stmt_while(Compiler_t* compiler);
 static void stmt_for(Compiler_t* compiler);
+static void stmt_return(Compiler_t* compiler);
 
 
 
@@ -144,6 +167,8 @@ static void named_variable(Compiler_t* compiler, const Token_t name, bool can_as
 static void and_(Compiler_t* compiler, bool can_assign);
 static void or_(Compiler_t* compiler, bool can_assign);
 static void assignment(Compiler_t* compiler, Opc_t set_op, Opc_t get_op, unsigned arg);
+static void call(Compiler_t* compiler, bool can_assign);
+static uint8_t arglist(Compiler_t* compiler);
 
 
 
@@ -214,7 +239,7 @@ static void synchronize(Compiler_t* compiler);
 
 static const ParseRule_t s_rules[] = 
 {
-  [TOKEN_LEFT_PAREN]    = {grouping, NULL,   NULL,   PREC_NONE},
+  [TOKEN_LEFT_PAREN]    = {grouping, call,   NULL,   PREC_NONE},
   [TOKEN_RIGHT_PAREN]   = {NULL,     NULL,   NULL,   PREC_NONE},
   [TOKEN_LEFT_BRACE]    = {NULL,     NULL,   NULL,   PREC_NONE}, 
   [TOKEN_RIGHT_BRACE]   = {NULL,     NULL,   NULL,   PREC_NONE},
@@ -280,10 +305,11 @@ static const ParseRule_t s_rules[] =
 
 
 
-bool Compile(VMData_t* data, const char* src, Chunk_t* chunk)
+ObjFunction_t* Compile(VMData_t* data, const char* src)
 {
     Compiler_t compiler;
-    compiler_init(&compiler, data, src, chunk);
+    CompilerData_t compdat;
+    compiler_init(&compiler, data, src, &compdat);
 
 
     advance(&compiler);
@@ -291,9 +317,12 @@ bool Compile(VMData_t* data, const char* src, Chunk_t* chunk)
     {
         declaration(&compiler);
     }
-    const bool error = compiler.parser.had_error;
-    compiler_end(&compiler);
-    return !error;
+
+    ObjFunction_t* fun = compiler_end(&compiler);
+    if (compiler.parser.had_error)
+        return NULL;
+    else
+        return fun;
 }
 
 
@@ -312,29 +341,67 @@ bool Compile(VMData_t* data, const char* src, Chunk_t* chunk)
 
 
 
-static void compiler_init(Compiler_t* compiler, VMData_t* data, const char* src, Chunk_t* chunk)
+static void compiler_init(Compiler_t* compiler, VMData_t* data, const char* src, CompilerData_t* compdat)
 {
     Scanner_Init(&compiler->scanner, src);
     compiler->parser.had_error = false;
     compiler->parser.panic_mode = false;
-    compiler->chunk = chunk;
     compiler->vmdata = data;
+    compiler->data = NULL;
+    compdat_init(compiler, compdat, TYPE_SCRIPT);
+}
 
-    compiler->local_count = 0;
-    compiler->scope_depth = 0;
+static ObjFunction_t* compiler_end(Compiler_t* compiler)
+{
+    return compdat_end(compiler, compiler->data);
 }
 
 
 
-static void compiler_end(Compiler_t* compiler)
+
+
+
+static void compdat_init(Compiler_t* compiler, CompilerData_t* compdat, FunctionType_t type)
+{
+    compdat->next = compiler->data;
+    compiler->data = compdat;
+
+    compdat->fun = NULL;
+    compdat->fun = ObjFun_Create(compiler->vmdata, 
+        compiler->parser.prev.line
+    );
+    if (type != TYPE_SCRIPT)
+    {
+        compdat->fun->name = ObjStr_Copy(compiler->vmdata, 
+            compiler->parser.prev.start, 
+            compiler->parser.prev.len
+        );
+    }
+
+    compdat->funtype = type;
+
+    compdat->scope_depth = 0;
+    compdat->local_count = 0;
+}
+
+
+
+static ObjFunction_t* compdat_end(Compiler_t* compiler, CompilerData_t* compdat)
 {
     emit_return(compiler);
+    ObjFunction_t* fun = compdat->fun;
+
 #ifdef DEBUG_PRINT_CODE
     if (!compiler->parser.had_error)
     {
-        Disasm_Chunk(stderr, current_chunk(compiler), "debug");
+        Disasm_Chunk(stderr, current_chunk(compiler), 
+            fun->name != NULL ? fun->name->cstr : "<script>"
+        );
     }
 #endif /* DEBUG_PRINT_CODE */
+
+    compiler->data = compdat->next;
+    return fun;
 }
 
 
@@ -409,7 +476,7 @@ static size_t parse_variable(Compiler_t* compiler, const char* errmsg)
 {
     consume(compiler, TOKEN_IDENTIFIER, errmsg);
 
-    if (compiler->scope_depth > 0)
+    if (compiler->data->scope_depth > 0)
     {
         declare_local(compiler);
         return 0; /* dummy value */
@@ -421,8 +488,11 @@ static size_t parse_variable(Compiler_t* compiler, const char* errmsg)
 
 static void mark_initialized(Compiler_t* compiler)
 {
-    compiler->locals[compiler->local_count - 1].depth = 
-        compiler->scope_depth;
+    if (compiler->data->scope_depth == 0) 
+        return;
+
+    compiler->data->locals[compiler->data->local_count - 1].depth = 
+        compiler->data->scope_depth;
 }
 
 
@@ -447,9 +517,9 @@ static bool identifiers_equal(const Token_t a, const Token_t b)
 
 static int resolve_local(Compiler_t* compiler, const Token_t name)
 {
-    for (int i = compiler->local_count - 1; i >= 0; i--)
+    for (int i = compiler->data->local_count - 1; i >= 0; i--)
     {
-        Local_t* local = &compiler->locals[i];
+        Local_t* local = &compiler->data->locals[i];
         if (identifiers_equal(local->name, name))
         {
             if (!LOCAL_DEFINED(local))
@@ -465,7 +535,7 @@ static int resolve_local(Compiler_t* compiler, const Token_t name)
 
 static void define_variable(Compiler_t* compiler, size_t global_index)
 {
-    if (compiler->scope_depth > 0)
+    if (compiler->data->scope_depth > 0)
     {
         mark_initialized(compiler);
         return;
@@ -478,10 +548,10 @@ static void declare_local(Compiler_t* compiler)
 {
     Token_t* name = &compiler->parser.prev;
 
-    for (int i = compiler->local_count - 1; i >= 0; i++)
+    for (int i = compiler->data->local_count - 1; i >= 0; i++)
     {
-        Local_t* local = &compiler->locals[i];
-        if (LOCAL_DEFINED(local) && local->depth < compiler->scope_depth)
+        Local_t* local = &compiler->data->locals[i];
+        if (LOCAL_DEFINED(local) && local->depth < compiler->data->scope_depth)
         {
             break;
         }
@@ -499,17 +569,17 @@ static void declare_local(Compiler_t* compiler)
 
 static void add_local(Compiler_t* compiler, const Token_t name)
 {
-    if (compiler->local_count >= UINT8_COUNT)
+    if (compiler->data->local_count >= UINT8_COUNT)
     {
         error(&compiler->parser, "Too many local variables in scope.");
         return;
     }
 
-    Local_t *local = &compiler->locals[compiler->local_count];
+    Local_t *local = &compiler->data->locals[compiler->data->local_count];
 
     local->name = name;
     local->depth = VAR_UNDEFINED;
-    compiler->local_count += 1;
+    compiler->data->local_count += 1;
 }
 
 
@@ -522,6 +592,10 @@ static void declaration(Compiler_t* compiler)
     if (match(compiler, TOKEN_VAR))
     {
         decl_var(compiler);
+    }
+    else if (match(compiler, TOKEN_FUN))
+    {
+        decl_fun(compiler);
     }
     else 
     {
@@ -554,6 +628,50 @@ static void decl_var(Compiler_t* compiler)
 }
 
 
+static void decl_fun(Compiler_t* compiler)
+{
+    uint32_t global = parse_variable(compiler, "Expected function name.");
+    mark_initialized(compiler);
+
+    function(compiler, TYPE_FUNCTION);
+    define_variable(compiler, global);
+}
+
+
+static void function(Compiler_t* compiler, FunctionType_t type)
+{
+    CompilerData_t fundat;
+    compdat_init(compiler, &fundat, type);
+    scope_begin(compiler);
+    {
+        consume(compiler, TOKEN_LEFT_PAREN, "Expected '(' after function name.");
+        if (!current_token_type(compiler, TOKEN_RIGHT_PAREN))
+        {
+            do {
+                fundat.fun->arity += 1;
+                if (fundat.fun->arity > MAX_ARGCOUNT)
+                {
+                    error_at_current(&compiler->parser, "Can't have more than 255 parameters.");
+                }
+
+                uint8_t constant = parse_variable(compiler, "Expected parameter name.");
+                define_variable(compiler, constant);
+            } while (!match(compiler, TOKEN_RIGHT_PAREN));
+        }
+        consume(compiler, TOKEN_LEFT_BRACE, "Expected '{' before function body.");
+
+        stmt_block(compiler);
+    }
+    // no need for this scope end because the compiler is ending anyway 
+    // scope_end(compiler);
+    ObjFunction_t* fun = compdat_end(compiler, &fundat);
+    emit_constant(compiler, OBJ_VAL(fun));
+}
+
+
+
+
+
 
 
 
@@ -564,6 +682,10 @@ static void statement(Compiler_t* compiler)
     if (match(compiler, TOKEN_PRINT))
     {
         stmt_print(compiler);
+    }
+    else if (match(compiler, TOKEN_RETURN))
+    {
+        stmt_return(compiler);
     }
     else if (match(compiler, TOKEN_FOR))
     {
@@ -647,7 +769,7 @@ static void stmt_if(Compiler_t* compiler)
 
 static void scope_begin(Compiler_t* compiler)
 {
-    compiler->scope_depth += 1;
+    compiler->data->scope_depth += 1;
 }
 
 
@@ -665,15 +787,15 @@ static void stmt_block(Compiler_t* compiler)
 
 static void scope_end(Compiler_t* compiler)
 {
-    compiler->scope_depth -= 1;
+    compiler->data->scope_depth -= 1;
     int popped_vars = 0;
 
-    while (compiler->local_count > 0
-        && compiler->locals[compiler->local_count - 1].depth > compiler->scope_depth
+    while (compiler->data->local_count > 0
+        && compiler->data->locals[compiler->data->local_count - 1].depth > compiler->data->scope_depth
     )
     {
         popped_vars += 1;
-        compiler->local_count -= 1;
+        compiler->data->local_count -= 1;
     }
 
 
@@ -778,6 +900,26 @@ static void stmt_for(Compiler_t* compiler)
         }
     }
     scope_end(compiler);
+}
+
+
+static void stmt_return(Compiler_t* compiler)
+{
+    if (compiler->data->funtype == TYPE_SCRIPT)
+    {
+        error(&compiler->parser, "Cannot return from top-level code.");
+        return;
+    }
+    if (match(compiler, TOKEN_SEMICOLON))
+    {
+        emit_return(compiler);
+    }
+    else 
+    {
+        expression(compiler);
+        consume(compiler, TOKEN_SEMICOLON, "Expected ';' after expression.");
+        emit_byte(compiler, OP_RETURN);
+    }
 }
 
 
@@ -997,6 +1139,31 @@ static void assignment(Compiler_t* compiler, Opc_t set_op, Opc_t get_op, unsigne
 }
 
 
+static void call(Compiler_t* compiler, bool can_assign)
+{
+    uint8_t argc = arglist(compiler);
+    emit_2_bytes(compiler, OP_CALL, argc);
+}
+
+
+static uint8_t arglist(Compiler_t* compiler)
+{
+    uint8_t argc = 0;
+    if (!current_token_type(compiler, TOKEN_RIGHT_PAREN))
+    {
+        do {
+            if (argc == MAX_ARGCOUNT)
+            {
+                error(&compiler->parser, "Cannot have more than 255 arguments.");
+            }
+            expression(compiler);
+            argc += 1;
+        } while (match(compiler, TOKEN_COMMA));
+    }
+    consume(compiler, TOKEN_RIGHT_PAREN, "Expected ')' after argument list.");
+    return argc;
+    return argc;
+}
 
 
 
@@ -1059,7 +1226,7 @@ static void emit_global(Compiler_t* compiler, Opc_t opcode, size_t addr)
 
 static void emit_return(Compiler_t* compiler)
 {
-    emit_byte(compiler, OP_RETURN);
+    emit_2_bytes(compiler, OP_NIL, OP_RETURN);
 }
 
 
@@ -1122,7 +1289,7 @@ static void emit_loop(Compiler_t* compiler, size_t loop_head)
 
 static Chunk_t* current_chunk(Compiler_t* compiler)
 {
-    return compiler->chunk;
+    return &compiler->data->fun->chunk;
 }
 
 

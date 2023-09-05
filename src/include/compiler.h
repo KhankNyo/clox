@@ -4,11 +4,11 @@
 
 
 #include "common.h"
-#include "chunk.h"
+#include "object.h"
 #include "typedefs.h"
 
 
-bool Compile(VMData_t* data, const char* src, Chunk_t* chunk);
+ObjFunction_t* Compile(VMData_t* data, const char* src);
 
 
 

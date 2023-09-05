@@ -17,6 +17,9 @@
 
 #define HASH_BYTE(prev_hash, ch) (((prev_hash) ^ (uint8_t)(ch)) * 16777619)
 
+
+static void print_function(FILE* fout, const ObjFunction_t* fun);
+
 #ifndef OBJSTR_FLEXIBLE_ARR
 static ObjString_t* allocate_string(VMData_t* vmdata, char* cstr, int len, uint32_t hash);
 #endif /* OBJSTR_FLEXIBLE_ARR */
@@ -42,6 +45,18 @@ void Obj_Free(Allocator_t* alloc, Obj_t* obj)
 
     switch (obj->type)
     {
+    case OBJ_NATIVE:
+        FREE(alloc, ObjNativeFn_t, obj);
+        break;
+
+    case OBJ_FUNCTION:
+    {
+        ObjFunction_t* fun = (ObjFunction_t*)obj;
+        Chunk_Free(&fun->chunk);
+        FREE(alloc, ObjFunction_t, fun);
+    }
+    break;
+
     case OBJ_STRING:
     {
         ObjString_t* str = (ObjString_t*)obj;
@@ -56,6 +71,30 @@ void Obj_Free(Allocator_t* alloc, Obj_t* obj)
     }
 }
 
+
+
+
+
+
+
+
+ObjNativeFn_t* ObjNFn_Create(VMData_t* vmdata, NativeFn_t fn)
+{
+    ObjNativeFn_t* native = ALLOCATE_OBJ(vmdata, ObjNativeFn_t, OBJ_NATIVE);
+    native->fn = fn;
+    return native;
+}
+
+
+
+ObjFunction_t* ObjFun_Create(VMData_t* vmdata, line_t line)
+{
+    ObjFunction_t* fun = ALLOCATE_OBJ(vmdata, ObjFunction_t, OBJ_FUNCTION);
+    fun->arity = 0;
+    fun->name = NULL;
+    Chunk_Init(&fun->chunk, vmdata->alloc, line);
+    return fun;
+}
 
 
 
@@ -156,6 +195,14 @@ void Obj_Print(FILE* fout, const Value_t val)
 {
     switch (OBJ_TYPE(val))
     {
+    case OBJ_NATIVE:
+        fprintf(fout, "<native fn>");
+        break;
+
+    case OBJ_FUNCTION:
+        print_function(fout, AS_FUNCTION(val));
+        break;
+
     case OBJ_STRING:
         fprintf(fout, "%s", AS_CSTR(val));
         break;
@@ -170,6 +217,16 @@ void Obj_Print(FILE* fout, const Value_t val)
 
 
 
+
+
+
+static void print_function(FILE* fout, const ObjFunction_t* fun)
+{
+    if (fun->name == NULL)
+        fprintf(fout, "<script>");
+    else
+        fprintf(fout, "<fn %s>", fun->name->cstr);
+}
 
 
 

@@ -39,7 +39,7 @@ void Clox_RunFile(Clox_t* clox, const char* file_path)
 {
     size_t src_size = 0;
     char* src = load_file_content(&clox->alloc, file_path, &src_size);
-    InterpretResult_t ret = VM_Interpret(&clox->vm, &clox->alloc, src);
+    InterpretResult_t ret = VM_Interpret(&clox->vm, src);
     unload_file_content(&clox->alloc, src);
 
     if (ret == INTERPRET_COMPILE_ERROR)
@@ -64,9 +64,15 @@ void Clox_Repl(Clox_t* clox)
         {
             break;
         }
+        else if (strncmp(line, "reset\n", sizeof("reset")) == 0)
+        {
+            VM_Free(&clox->vm);
+            VM_Init(&clox->vm, &clox->alloc);
+            continue;
+        }
 
 
-        VM_Interpret(&clox->vm, &clox->alloc, line);
+        VM_Interpret(&clox->vm, line);
     }
 }
 

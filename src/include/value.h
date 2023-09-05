@@ -45,9 +45,11 @@ typedef struct
 #define NUMBER_VAL(val)		((Value_t){.type = VAL_NUMBER,	.as.number = val,})
 #define OBJ_VAL(val)		((Value_t){.type = VAL_OBJ,		.as.obj = (Obj_t*)(val),})
 
+
 #define AS_BOOL(value)		((value).as.boolean)
 #define AS_NUMBER(value)	((value).as.number)
 #define AS_OBJ(value)		((value).as.obj)
+
 
 #define IS_BOOL(value)		((value).type == VAL_BOOL)
 #define IS_NIL(value)		((value).type == VAL_NIL)

@@ -3,13 +3,13 @@
 
 
 #include "common.h"
-#include "chunk.h"
 #include "value.h"
 #include "memory.h"
 #include "table.h"
+#include "object.h"
 
-#define VM_STACK_MAX 256
-
+#define VM_FRAMES_MAX 128
+#define VM_STACK_MAX (VM_FRAMES_MAX*UINT8_COUNT)
 
 struct VMData_t
 {
@@ -19,12 +19,22 @@ struct VMData_t
     Obj_t* head;
 };
 
+
+
+typedef struct CallFrame_t
+{
+    ObjFunction_t* fun;
+    uint8_t* ip;
+    Value_t* base;
+} CallFrame_t;
+
 typedef struct VM_t
 {
-    Chunk_t* chunk;
-    uint8_t* ip;
-    Value_t stack[VM_STACK_MAX];
+    int frame_count;
     Value_t* sp;
+
+    CallFrame_t frames[VM_FRAMES_MAX];
+    Value_t stack[VM_STACK_MAX];
 
     VMData_t data;
 } VM_t;
@@ -44,10 +54,15 @@ void VM_Free(VM_t* vm);
 
 
 /* pushes a value onto the vm's stack */
-void VM_Push(VM_t* vm, Value_t val);
+bool VM_Push(VM_t* vm, Value_t val);
 
 /* pops a value off the vm's stack */
 Value_t VM_Pop(VM_t* vm);
+
+/*
+ *  defines a C function that can interface with clox
+ */
+void VM_DefineNative(VM_t* vm, const char* name, NativeFn_t fn);
 
 
 
@@ -57,7 +72,7 @@ Value_t VM_Pop(VM_t* vm);
  *  \returns INTERPRET_COMPILE_ERROR if a compilation error was encountered
  *  \returns INTERPRET_OK if no errors were encountered
  */
-InterpretResult_t VM_Interpret(VM_t* vm, Allocator_t* alloc, const char* src);
+InterpretResult_t VM_Interpret(VM_t* vm, const char* src);
 
 
 
