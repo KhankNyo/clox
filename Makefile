@@ -1,6 +1,6 @@
 CC=gcc
-CCF=-Wall -std=c99 -Wextra -Wpedantic -DOBJSTR_FLEXIBLE_ARR -g -Og -DDEBUG
-LDF=
+CCF=-std=c99 -Wall -Wextra -Wpedantic -DOBJSTR_FLEXIBLE_ARR -flto -Ofast
+LDF=-flto
 LIBS=
 
 
@@ -22,6 +22,7 @@ OUTPUT=bin/main$(EXEC_FMT)
 all:$(OUTPUT)
 
 
+
 obj bin:
 	mkdir $@
 
@@ -29,7 +30,7 @@ $(OUTPUT):obj bin $(OBJS)
 	$(CC) $(LDF) -o $@ $(OBJS) $(LIBS)
 
 obj/%.o:src/%.c
-	$(CC) $(CCF) -c $^ -o $@ 
+	$(CC) $(CCF) -c $< -o $@
 
 
 clean:

@@ -160,11 +160,28 @@ Token_t Scanner_ScanToken(Scanner_t* scanner)
     case ';': return make_token(scanner, TOKEN_SEMICOLON);
     case ',': return make_token(scanner, TOKEN_COMMA);
     case '.': return make_token(scanner, TOKEN_DOT);
-    case '-': return make_token(scanner, TOKEN_MINUS);
-    case '+': return make_token(scanner, TOKEN_PLUS);
-    case '/': return make_token(scanner, TOKEN_SLASH);
-    case '*': return make_token(scanner, TOKEN_STAR);
 
+
+    case '-': 
+        if (match(scanner, '='))
+            return make_token(scanner, TOKEN_MINUS_EQUAL);
+        else
+            return make_token(scanner, TOKEN_MINUS);
+    case '+': 
+        if (match(scanner, '='))
+            return make_token(scanner, TOKEN_PLUS_EQUAL);
+        else
+            return make_token(scanner, TOKEN_PLUS);
+    case '/': 
+        if (match(scanner, '='))
+            return make_token(scanner, TOKEN_SLASH_EQUAL);
+        else
+            return make_token(scanner, TOKEN_SLASH);
+    case '*': 
+        if (match(scanner, '='))
+            return make_token(scanner, TOKEN_STAR_EQUAL);
+        else 
+            return make_token(scanner, TOKEN_STAR);
     case '!':
         if (match(scanner, '='))
             return make_token(scanner, TOKEN_BANG_EQUAL);
@@ -187,6 +204,7 @@ Token_t Scanner_ScanToken(Scanner_t* scanner)
             return make_token(scanner, TOKEN_GREATER);
 
     case '"': return string_token(scanner);
+    default: break;
     }
     
     return error_token(scanner, "Unexpected token.");

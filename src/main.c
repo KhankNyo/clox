@@ -10,7 +10,7 @@
 int main(int argc, char** argv)
 {
 	Clox_t clox;
-	Clox_Init(&clox, 5 * 1024);
+	Clox_Init(&clox, 5 * 1024 * 1024);
 	
 	if (1 == argc)
 	{

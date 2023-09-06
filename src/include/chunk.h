@@ -19,6 +19,8 @@ typedef enum Opc_t
 	OP_TRUE,
 	OP_FALSE,
     OP_POP,
+    OP_GET_LOCAL,
+    OP_SET_LOCAL,
     OP_GET_GLOBAL,
     OP_DEFINE_GLOBAL,
     OP_SET_GLOBAL,
@@ -32,10 +34,15 @@ typedef enum Opc_t
 	OP_NOT,
 	OP_NEGATE,
     OP_PRINT,
+    OP_JUMP,
+    OP_JUMP_IF_FALSE,
+    OP_LOOP,
+    OP_CALL,
 	OP_RETURN,
 
 
-	/* challenges */
+	/* challenges/extensions */
+    OP_POPN                 = OP_POP | 0x80,
 	OP_CONSTANT_LONG        = OP_CONSTANT | 0x80,
     OP_DEFINE_GLOBAL_LONG   = OP_DEFINE_GLOBAL | 0x80,
     OP_GET_GLOBAL_LONG      = OP_GET_GLOBAL | 0x80,

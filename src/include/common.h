@@ -6,6 +6,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <inttypes.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -19,7 +20,7 @@
     do{                                                 \
         if (!(debug_expression))                        \
         {                                               \
-            fprintf(stderr, "file: %s, on line %d: %s", \
+            fprintf(stderr, "ASSERTION FAILED: file: %s, on line %d: %s", \
                 __FILE__, __LINE__, STR_EXPR(debug_expression));\
             abort();                                    \
         }                                               \
@@ -33,8 +34,9 @@
 #endif /* DEBUG */
 
 
+#define UINT8_COUNT (UINT8_MAX + 1)
 
-
+#define STATIC_ARRSZ(comptime_array) (sizeof(comptime_array) / sizeof(comptime_array[0])) 
 
 
 

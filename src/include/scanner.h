@@ -38,15 +38,19 @@ typedef enum TokenType_t
     TOKEN_TRUE, TOKEN_VAR, TOKEN_WHILE,
 
     TOKEN_ERROR, TOKEN_EOF,
+
+    // extensions
+    TOKEN_PLUS_EQUAL, TOKEN_MINUS_EQUAL,
+    TOKEN_SLASH_EQUAL, TOKEN_STAR_EQUAL,
 } TokenType_t;
 
 
 
 typedef struct Token_t
 {
-    TokenType_t type;
     const char* start;
     size_t len;
+    TokenType_t type;
     line_t line;
 } Token_t;
 

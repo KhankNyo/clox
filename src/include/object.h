@@ -5,18 +5,27 @@
 #include "common.h"
 #include "value.h"
 #include "typedefs.h"
+#include "chunk.h"
 
 
 
 #define OBJ_TYPE(value)     (AS_OBJ(value)->type)
+
 #define IS_STRING(value)    is_objtype(value, OBJ_STRING)
+#define IS_FUNCTION(value)  is_objtype(value, OBJ_FUNCTION)
+#define IS_NATIVE(value)    is_objtype(value, OBJ_NATUVE)
 
 #define AS_STR(value)       ((ObjString_t*)AS_OBJ(value))
 #define AS_CSTR(value)      (AS_STR(value)->cstr)
+#define AS_FUNCTION(value)  ((ObjFunction_t*)AS_OBJ(value))
+#define AS_NATIVE(value)    (((ObjNativeFn_t*)AS_OBJ(value)))
+
 
 typedef enum ObjType_t
 {
     OBJ_STRING,
+    OBJ_FUNCTION,
+    OBJ_NATIVE,
 } ObjType_t;
 
 struct Obj_t
@@ -24,6 +33,28 @@ struct Obj_t
     ObjType_t type;
     Obj_t* next;
 };
+
+
+
+
+
+typedef Value_t (*NativeFn_t)(int argc, Value_t* argv);
+typedef struct ObjNativeFn_t
+{
+    Obj_t obj;
+
+    int arity;
+    NativeFn_t fn; /* this ain't fun */
+} ObjNativeFn_t;
+
+typedef struct ObjFunction_t
+{
+    Obj_t obj;
+
+    int arity;
+    Chunk_t chunk;
+    ObjString_t* name;
+} ObjFunction_t;
 
 
 struct ObjString_t
@@ -44,6 +75,20 @@ struct ObjString_t
  *  Free the obj pointer and the underlying object iself
  */
 void Obj_Free(Allocator_t* alloc, Obj_t* obj);
+
+
+
+
+
+/*
+ *  Creates a new ObjNativeFn_t from a C function pointer and its arity (arg count) 
+ */
+ObjNativeFn_t* ObjNFn_Create(VMData_t* vmdata, NativeFn_t fn, uint8_t arity);
+
+/*
+ *  Creates a new ObjFunction_t, cleanup using Obj_Free()
+ */
+ObjFunction_t* ObjFun_Create(VMData_t* vmdata, line_t line);
 
 
 
@@ -88,8 +133,8 @@ uint32_t ObjStr_HashStrs(int count, const ObjString_t* strings[static count]);
 #endif /* OBJSTR_FLEXIBLE_ARR */
 
 
-/* prints a val to stdout */
-void Obj_Print(const Value_t val);
+/* prints a val to fout stream */
+void Obj_Print(FILE* fout, const Value_t val);
 
 
 
