@@ -33,7 +33,7 @@ obj/%.o:src/%.c
 
 
 clean:
-	rm -f $(OBJS) $(OUTPUT)
+	rm -f obj/* bin/*
 	rmdir obj bin
 
 
