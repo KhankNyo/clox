@@ -6,65 +6,64 @@
 
 
 
-void LineInfo_Init(LineInfo_t* li, Allocator_t* alloc, line_t start)
+void LineInfo_Init(LineInfo_t* li, Allocator_t* alloc)
 {
-	li->changes = NULL;
+    li->at = NULL;
 	li->count = 0;
 	li->capacity = 0;
-	li->start = start;
+    li->prevline = 0;
 	li->alloc = alloc;
 }
 	
 
-void LineInfo_Write(LineInfo_t* li, size_t ins_offset)
+void LineInfo_Write(LineInfo_t* li, size_t addr, line_t line)
 {
+    if (line == li->prevline)
+    {
+        return;
+    }
+    else
+    {
+        li->prevline = line;
+    }
+
 	if (li->count + 1 > li->capacity)
 	{
 		const size_t oldcap = li->capacity;
 		li->capacity = GROW_CAPACITY(li->capacity);
-		li->changes = GROW_ARRAY(li->alloc, size_t, 
-			li->changes, oldcap, li->capacity
+		li->at = GROW_ARRAY(li->alloc, LineAddr_t, 
+			li->at, oldcap, li->capacity
 		);
 	}
 
-	li->changes[li->count] = ins_offset;
+	li->at[li->count] = (LineAddr_t){ 
+        .addr = addr,
+        .line = line,
+    };
 	li->count++;
 }
 	
 
-uint32_t LineInfo_GetLine(const LineInfo_t li, size_t offset)
+line_t LineInfo_GetLine(const LineInfo_t li, size_t addr)
 {
-	
-	if ((li.count != 0) && (offset > li.changes[li.count - 1]))
-		return li.start + li.count - 1;
+    if (li.count == 0)
+        return 1;
+    else if (addr == 0)
+        return li.at[0].line;
+    else if (li.at[li.count - 1].addr <= addr)
+        return li.at[li.count - 1].line;
 
+    line_t i = 0;
+    while (i < li.count && li.at[i].addr < addr)
+        i++;
 
-	line_t start = 0;
-	line_t end = li.count;
-	line_t midpoint = 1;
-
-	/* binary search, instruction offsets are guaranteed to be pushed in ascending order */
-	while ((start < end) && (start != midpoint))
-	{
-		midpoint = start + (end - start) / 2;
-		if (li.changes[midpoint] < offset)
-		{
-			start = midpoint;
-		}
-		else if (li.changes[midpoint] > offset)
-		{
-			end = midpoint;
-		}
-		else break;
-	}
-	return li.start + midpoint;
+    return li.at[i - 1].line;
 }
 
 
 void LineInfo_Free(LineInfo_t* li)
 {
-	const line_t start = li->start;
-	FREE_ARRAY(li->alloc, size_t, li->changes, li->capacity);
-	LineInfo_Init(li, li->alloc, start);
+	FREE_ARRAY(li->alloc, LineAddr_t, li->at, li->capacity);
+	LineInfo_Init(li, li->alloc);
 }
 

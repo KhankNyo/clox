@@ -7,28 +7,21 @@
 
 
 
-void Chunk_Init(Chunk_t* chunk, Allocator_t* alloc, line_t line_start)
+void Chunk_Init(Chunk_t* chunk, Allocator_t* alloc)
 {
 	chunk->code = NULL;
 	chunk->size = 0;
 	chunk->capacity = 0;
 	chunk->alloc = alloc;
-	chunk->prevline = 0;
 
-	LineInfo_Init(&chunk->line_info, alloc, line_start);
+	LineInfo_Init(&chunk->line_info, alloc);
 	ValArr_Init(&chunk->consts, alloc);
 }
 
 
 void Chunk_Write(Chunk_t* chunk, uint8_t byte, line_t line)
 {
-	if (line != chunk->prevline)
-	{
-		chunk->prevline = line;
-		LineInfo_Write(&chunk->line_info, chunk->size);
-	}
-
-
+    LineInfo_Write(&chunk->line_info, chunk->size, line);
 	if (chunk->size + 1 > chunk->capacity)
 	{
 		const size_t oldcap = chunk->capacity;
@@ -86,12 +79,10 @@ size_t Chunk_WriteConstant(Chunk_t* chunk, Value_t constant, line_t line)
 
 void Chunk_Free(Chunk_t* chunk)
 {
-	const line_t line_start = chunk->line_info.start;
-
 	FREE_ARRAY(chunk->alloc, uint8_t, chunk->code, chunk->capacity);
 	LineInfo_Free(&chunk->line_info);
 	ValArr_Free(&chunk->consts);
 
-	Chunk_Init(chunk, chunk->alloc, line_start);
+	Chunk_Init(chunk, chunk->alloc);
 }
 

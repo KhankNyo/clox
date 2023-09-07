@@ -60,12 +60,11 @@ typedef struct Chunk_t
 
 	ValueArr_t consts;
 	LineInfo_t line_info;
-	line_t prevline;
 } Chunk_t;
 
 
 /* set all members to 0 */
-void Chunk_Init(Chunk_t* chunk, Allocator_t* alloc, line_t line_start);
+void Chunk_Init(Chunk_t* chunk, Allocator_t* alloc);
 
 /* writes an op byte to the chunk's code */
 void Chunk_Write(Chunk_t* chunk, uint8_t byte, line_t line);

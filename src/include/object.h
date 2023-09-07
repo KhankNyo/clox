@@ -101,7 +101,7 @@ ObjNativeFn_t* ObjNFn_Create(VMData_t* vmdata, NativeFn_t fn, uint8_t arity);
 /*
  *  Creates a new ObjFunction_t, cleanup using Obj_Free()
  */
-ObjFunction_t* ObjFun_Create(VMData_t* vmdata, line_t line);
+ObjFunction_t* ObjFun_Create(VMData_t* vmdata);
 
 /*
  *  wraps a function around a closure object, cleanup using Obj_Free()

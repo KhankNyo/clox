@@ -93,12 +93,12 @@ ObjNativeFn_t* ObjNFn_Create(VMData_t* vmdata, NativeFn_t fn, uint8_t arity)
 
 
 
-ObjFunction_t* ObjFun_Create(VMData_t* vmdata, line_t line)
+ObjFunction_t* ObjFun_Create(VMData_t* vmdata)
 {
     ObjFunction_t* fun = ALLOCATE_OBJ(vmdata, ObjFunction_t, OBJ_FUNCTION);
     fun->arity = 0;
     fun->name = NULL;
-    Chunk_Init(&fun->chunk, vmdata->alloc, line);
+    Chunk_Init(&fun->chunk, vmdata->alloc);
     return fun;
 }
 

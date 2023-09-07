@@ -314,7 +314,6 @@ ObjFunction_t* Compile(VMData_t* data, const char* src)
     compiler_init(&compiler, data, src, &compdat);
 
 
-    advance(&compiler);
     while (!match(&compiler, TOKEN_EOF))
     {
         declaration(&compiler);
@@ -351,6 +350,7 @@ static void compiler_init(Compiler_t* compiler, VMData_t* data, const char* src,
     compiler->vmdata = data;
     compiler->data = NULL;
 
+    advance(compiler);
     compdat_init(compiler, compdat, TYPE_SCRIPT);
 }
 
@@ -371,9 +371,7 @@ static void compdat_init(Compiler_t* compiler, CompilerData_t* compdat, Function
 
 
     compdat->fun = NULL;
-    compdat->fun = ObjFun_Create(compiler->vmdata, 
-        compiler->parser.prev.line
-    );
+    compdat->fun = ObjFun_Create(compiler->vmdata);
     if (type != TYPE_SCRIPT)
     {
         compdat->fun->name = ObjStr_Copy(compiler->vmdata, 
