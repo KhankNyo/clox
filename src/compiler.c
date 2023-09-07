@@ -369,6 +369,7 @@ static void compdat_init(Compiler_t* compiler, CompilerData_t* compdat, Function
     compdat->next = compiler->data;
     compiler->data = compdat;
 
+
     compdat->fun = NULL;
     compdat->fun = ObjFun_Create(compiler->vmdata, 
         compiler->parser.prev.line
@@ -673,7 +674,7 @@ static void function(Compiler_t* compiler, FunctionType_t type)
     // no need for this scope end because the compiler is ending anyway 
     // scope_end(compiler);
     ObjFunction_t* fun = compdat_end(compiler, &fundat);
-    uint32_t fun_addr = emit_constant(compiler, OBJ_VAL(fun));
+    uint32_t fun_addr = Chunk_AddConstant(current_chunk(compiler), OBJ_VAL(fun));
     emit_2_bytes(compiler, OP_CLOSURE, fun_addr);
 }
 

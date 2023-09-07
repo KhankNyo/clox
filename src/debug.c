@@ -187,6 +187,7 @@ size_t Disasm_Instruction(FILE* fout, const Chunk_t* chunk, size_t offset)
     {
         offset++; /* skip instruction */
         uint8_t constant = chunk->code[offset++];
+
         fprintf(fout, INS_FMTSTR"%4d", "OP_CLOSURE", constant);
         Value_Print(fout, chunk->consts.vals[constant]);
         fputc('\n', fout);
