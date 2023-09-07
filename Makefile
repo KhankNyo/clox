@@ -1,6 +1,6 @@
 CC=gcc
-CCF=-std=c99 -Wall -Wextra -Wpedantic -DOBJSTR_FLEXIBLE_ARR -flto -Ofast
-LDF=-flto
+CCF=-DDEBUG -g -Og -std=c99 -Wall -Wextra -Wpedantic -DOBJSTR_FLEXIBLE_ARR
+LDF=
 LIBS=
 
 
