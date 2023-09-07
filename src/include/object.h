@@ -13,11 +13,13 @@
 
 #define IS_STRING(value)    is_objtype(value, OBJ_STRING)
 #define IS_FUNCTION(value)  is_objtype(value, OBJ_FUNCTION)
+#define IS_CLOSURE(value)   is_objtype(value, OBJ_CLOSURE)
 #define IS_NATIVE(value)    is_objtype(value, OBJ_NATUVE)
 
 #define AS_STR(value)       ((ObjString_t*)AS_OBJ(value))
 #define AS_CSTR(value)      (AS_STR(value)->cstr)
 #define AS_FUNCTION(value)  ((ObjFunction_t*)AS_OBJ(value))
+#define AS_CLOSURE(value)   ((ObjClosure_t*)(AS_OBJ(value)))
 #define AS_NATIVE(value)    (((ObjNativeFn_t*)AS_OBJ(value)))
 
 
@@ -25,6 +27,7 @@ typedef enum ObjType_t
 {
     OBJ_STRING,
     OBJ_FUNCTION,
+    OBJ_CLOSURE,
     OBJ_NATIVE,
 } ObjType_t;
 
@@ -47,6 +50,8 @@ typedef struct ObjNativeFn_t
     NativeFn_t fn; /* this ain't fun */
 } ObjNativeFn_t;
 
+
+
 typedef struct ObjFunction_t
 {
     Obj_t obj;
@@ -55,6 +60,13 @@ typedef struct ObjFunction_t
     Chunk_t chunk;
     ObjString_t* name;
 } ObjFunction_t;
+
+typedef struct ObjClosure_t
+{
+    Obj_t obj;
+    ObjFunction_t* fun;
+} ObjClosure_t;
+
 
 
 struct ObjString_t
@@ -81,7 +93,8 @@ void Obj_Free(Allocator_t* alloc, Obj_t* obj);
 
 
 /*
- *  Creates a new ObjNativeFn_t from a C function pointer and its arity (arg count) 
+ *  Creates a new ObjNativeFn_t from a C function pointer and its arity (arg count),
+ *  cleanup using Obj_Free()
  */
 ObjNativeFn_t* ObjNFn_Create(VMData_t* vmdata, NativeFn_t fn, uint8_t arity);
 
@@ -89,6 +102,11 @@ ObjNativeFn_t* ObjNFn_Create(VMData_t* vmdata, NativeFn_t fn, uint8_t arity);
  *  Creates a new ObjFunction_t, cleanup using Obj_Free()
  */
 ObjFunction_t* ObjFun_Create(VMData_t* vmdata, line_t line);
+
+/*
+ *  wraps a function around a closure object, cleanup using Obj_Free()
+ */
+ObjClosure_t* ObjCls_Create(VMData_t* vmdata, ObjFunction_t* fun);
 
 
 

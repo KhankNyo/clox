@@ -189,7 +189,7 @@ static void emit_global(Compiler_t* compiler, Opc_t opcode, size_t addr);
 static void emit_return(Compiler_t* compiler);
 
 /* pushes a constant into the constant table */
-static size_t emit_constant(Compiler_t* compiler, Value_t val);
+static uint32_t emit_constant(Compiler_t* compiler, Value_t val);
 
 /* emits a jump instruction, return the starting location of its operand */
 static size_t emit_jump(Compiler_t* compiler, Opc_t jump_op);
@@ -673,7 +673,8 @@ static void function(Compiler_t* compiler, FunctionType_t type)
     // no need for this scope end because the compiler is ending anyway 
     // scope_end(compiler);
     ObjFunction_t* fun = compdat_end(compiler, &fundat);
-    emit_constant(compiler, OBJ_VAL(fun));
+    uint32_t fun_addr = emit_constant(compiler, OBJ_VAL(fun));
+    emit_2_bytes(compiler, OP_CLOSURE, fun_addr);
 }
 
 
@@ -1240,9 +1241,9 @@ static void emit_return(Compiler_t* compiler)
 }
 
 
-static size_t emit_constant(Compiler_t* compiler, Value_t val)
+static uint32_t emit_constant(Compiler_t* compiler, Value_t val)
 {
-    size_t val_addr = Chunk_WriteConstant(
+    uint32_t val_addr = Chunk_WriteConstant(
         current_chunk(compiler), val, compiler->parser.prev.line
     );
     if (val_addr > MAX_CONST_IN_CHUNK)

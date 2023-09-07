@@ -27,14 +27,14 @@ static void str_concatenate(VM_t* vm);
 static void runtime_error(VM_t* vm, const char* fmt, ...);
 static void debug_trace_execution(const VM_t* vm);
 
-static bool push_cf(VM_t* vm, ObjFunction_t* fun, int argc);
 static CallFrame_t* peek_cf(VM_t* vm, int offset);
-static CallFrame_t* pop_cf(VM_t* vm);
 static void trace_cf(const VM_t* vm);
 
 
 static bool call_value(VM_t* vm, Value_t callee, int argc);
-static bool call(VM_t* vm, ObjFunction_t* fun, int argc);
+
+/* pushes a closure onto the call frame */
+static bool call(VM_t* vm, ObjClosure_t* closure, int argc);
 static bool call_native(VM_t* vm, ObjNativeFn_t* native, int argc);
 
 
@@ -130,7 +130,11 @@ InterpretResult_t VM_Interpret(VM_t* vm, const char* src)
         return INTERPRET_COMPILE_ERROR;
 
     VM_Push(vm, OBJ_VAL(fun));
-    call(vm, fun, 0);
+    ObjClosure_t* script = ObjCls_Create(&vm->data, fun);
+    VM_Pop(vm);
+    VM_Push(vm, OBJ_VAL(script));
+
+    call(vm, script, 0);
     return run(vm);
 }
 
@@ -166,9 +170,18 @@ static InterpretResult_t run(VM_t* vm)
     CLOX_ASSERT(vm->frame_count > 0);
     CallFrame_t* current = peek_cf(vm, 0);
 
+#define PUSH(val)\
+do{\
+    if (!VM_Push(vm, val))\
+        return INTERPRET_RUNTIME_ERROR;\
+}while(0)
+
+#define POP() VM_Pop(vm)
+
+
 #define GET_IP() (current->ip)
 #define READ_BYTE() (*GET_IP()++)
-#define READ_CONSTANT() (current->fun->chunk.consts.vals[READ_BYTE()])
+#define READ_CONSTANT() (current->closure->fun->chunk.consts.vals[READ_BYTE()])
 
 
 #define READ_SHORT() \
@@ -179,7 +192,7 @@ static InterpretResult_t run(VM_t* vm)
     (GET_IP() += 3, (((uint32_t)GET_IP()[-3] << 16) \
                    | ((uint32_t)GET_IP()[-2] << 8) \
                    | GET_IP()[-1]))
-#define READ_CONSTANT_LONG() (current->fun->chunk.consts.vals[READ_LONG()])
+#define READ_CONSTANT_LONG() (current->closure->fun->chunk.consts.vals[READ_LONG()])
 
 
 #define READ_STR() AS_STR(READ_CONSTANT())
@@ -194,7 +207,7 @@ static InterpretResult_t run(VM_t* vm)
             runtime_error(vm, "Undefined variable: '%s'.", name->cstr);\
             return INTERPRET_RUNTIME_ERROR;\
         }\
-        VM_Push(vm, val);\
+        PUSH(val);\
     } while (0)
 
 #define SET_GLOBAL(macro_read_str) \
@@ -214,16 +227,11 @@ do{\
         runtime_error(vm, "Operands must be numbers.");\
         return INTERPRET_RUNTIME_ERROR;\
     }\
-    double b = AS_NUMBER(VM_Pop(vm));\
-    double a = AS_NUMBER(VM_Pop(vm));\
-    VM_Push(vm, ValueType(a op b));\
+    double b = AS_NUMBER(POP());\
+    double a = AS_NUMBER(POP());\
+    PUSH(ValueType(a op b));\
 }while(0)
 
-#define PUSH(val)\
-do{\
-    if (!VM_Push(vm, val))\
-        return INTERPRET_RUNTIME_ERROR;\
-}while(0)
 
 
 
@@ -249,10 +257,10 @@ do{\
                 runtime_error(vm, "Operand must be a number.");
                 return INTERPRET_RUNTIME_ERROR;
             }
-            PUSH(NUMBER_VAL(-AS_NUMBER(VM_Pop(vm)))); 
+            PUSH(NUMBER_VAL(-AS_NUMBER(POP()))); 
             break;
 
-        case OP_NOT:        PUSH(BOOL_VAL(is_falsey(VM_Pop(vm)))); break;
+        case OP_NOT:        PUSH(BOOL_VAL(is_falsey(POP()))); break;
 
 
         case OP_ADD:
@@ -262,8 +270,8 @@ do{\
             }
             else if (IS_NUMBER(peek(vm, 0)) && IS_NUMBER(peek(vm, 1)))
             {
-                double b = AS_NUMBER(VM_Pop(vm));
-                double a = AS_NUMBER(VM_Pop(vm));
+                double b = AS_NUMBER(POP());
+                double a = AS_NUMBER(POP());
                 PUSH(NUMBER_VAL(a + b));
             }
             else
@@ -278,8 +286,8 @@ do{\
 
         case OP_EQUAL:
         {
-            Value_t b = VM_Pop(vm);
-            Value_t a = VM_Pop(vm);
+            Value_t b = POP();
+            Value_t a = POP();
             PUSH(BOOL_VAL(Value_Equal(a, b)));
         }
         break;
@@ -294,26 +302,26 @@ do{\
 
         case OP_PRINT:
         {
-            Value_Print(stdout, VM_Pop(vm));
+            Value_Print(stdout, POP());
             printf("\n");
         }
         break;
 
-        case OP_POP:        VM_Pop(vm); break;
+        case OP_POP:        POP(); break;
         case OP_POPN:       vm->sp -= READ_BYTE(); break;
 
         case OP_DEFINE_GLOBAL_LONG:
         {
             ObjString_t* name = READ_STR_LONG();
             Table_Set(&vm->data.globals, name, peek(vm, 0));
-            VM_Pop(vm);
+            POP();
         }
         break;
         case OP_DEFINE_GLOBAL:
         {
             ObjString_t* name = READ_STR();
             Table_Set(&vm->data.globals, name, peek(vm, 0));
-            VM_Pop(vm);
+            POP();
         }
         break;
 
@@ -371,21 +379,29 @@ do{\
             }
         }
         break;
+        case OP_CLOSURE:
+        {
+            ObjFunction_t* fun = AS_FUNCTION(READ_CONSTANT());
+            ObjClosure_t* closure = ObjCls_Create(&vm->data, fun);
+            PUSH(OBJ_VAL(closure));
+        }
+        break;
         case OP_RETURN:
         {
-            Value_t val = VM_Pop(vm);
+            Value_t val = POP();
             vm->frame_count--;
             if (vm->frame_count == 0)
             {
-                VM_Pop(vm);
+                POP();
                 return INTERPRET_OK;
             }
 
             vm->sp = current->base;
-            VM_Push(vm, val);
+            PUSH(val);
             current = peek_cf(vm, 0);
         }
         break;
+
 
         
         default: break;
@@ -504,33 +520,13 @@ static void debug_trace_execution(const VM_t* vm)
         fprintf(stderr, " ]");
     }
     fprintf(stderr, "\n");
-    Disasm_Instruction(stderr, &current->fun->chunk, current->ip - current->fun->chunk.code);
+    Disasm_Instruction(stderr, 
+        &current->closure->fun->chunk, 
+        current->ip - current->closure->fun->chunk.code
+    );
 #else
     (void)vm;
 #endif /* DEBUG_TRACE_EXECUTION */
-}
-
-
-static bool push_cf(VM_t* vm, ObjFunction_t* fun, int argc)
-{
-    if (vm->frame_count >= VM_FRAMES_MAX)
-    {
-        runtime_error(vm, "Call Stack overflow.");
-        return false;
-    }
-
-    CallFrame_t* current = &vm->frames[vm->frame_count++];
-    current->fun = fun;
-    current->ip = fun->chunk.code;
-    current->base = vm->sp - argc;
-    return true;
-}
-
-static CallFrame_t* pop_cf(VM_t* vm)
-{
-    CLOX_ASSERT(vm->frame_count > 0);
-    vm->frame_count -= 1;
-    return &vm->frames[vm->frame_count];
 }
 
 
@@ -548,7 +544,7 @@ static void trace_cf(const VM_t* vm)
     for (int i = 0; i < vm->frame_count; i++)
     {
         const CallFrame_t* frame = &vm->frames[i];
-        const ObjFunction_t* fun = frame->fun;
+        const ObjFunction_t* fun = frame->closure->fun;
         size_t ins = frame->ip - fun->chunk.code - 1;
         
         fprintf(stderr, "[line %d] in ",
@@ -582,7 +578,7 @@ static bool call_value(VM_t* vm, Value_t callee, int argc)
     switch (OBJ_TYPE(callee))
     {
     case OBJ_NATIVE: return call_native(vm, AS_NATIVE(callee), argc);
-    case OBJ_FUNCTION: return call(vm, AS_FUNCTION(callee), argc);
+    case OBJ_CLOSURE: return call(vm, AS_CLOSURE(callee), argc);
     default: break;
     }
 
@@ -593,14 +589,27 @@ error:
 }
 
 
-static bool call(VM_t* vm, ObjFunction_t* fun, int argc)
+static bool call(VM_t* vm, ObjClosure_t* closure, int argc)
 {
-    if (argc != fun->arity)
+    if (argc != closure->fun->arity)
     {
-        runtime_error(vm, "Expected %d arguments, got %d instead.", fun->arity, argc);
+        runtime_error(vm, "Expected %d arguments, got %d instead.", 
+            closure->fun->arity, argc
+        );
         return false;
     }
-    return push_cf(vm, fun, argc + 1);
+
+    if (vm->frame_count >= VM_FRAMES_MAX)
+    {
+        runtime_error(vm, "Call Stack overflow.");
+        return false;
+    }
+
+    CallFrame_t* current = &vm->frames[vm->frame_count++];
+    current->closure = closure;
+    current->ip = closure->fun->chunk.code;
+    current->base = vm->sp - argc - 1;
+    return true;
 }
 
 
@@ -613,9 +622,8 @@ static bool call_native(VM_t* vm, ObjNativeFn_t* native, int argc)
     }
 
     Value_t* base_args = vm->sp - argc;
-
     Value_t ret = native->fn(argc, base_args);
-    vm->sp = base_args + 1;
+    vm->sp = base_args;
     vm->sp[-1] = ret;
     return true;
 }

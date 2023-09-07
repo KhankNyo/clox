@@ -23,7 +23,7 @@ struct VMData_t
 
 typedef struct CallFrame_t
 {
-    ObjFunction_t* fun;
+    ObjClosure_t* closure;
     uint8_t* ip;
     Value_t* base;
 } CallFrame_t;

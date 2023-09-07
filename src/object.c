@@ -57,6 +57,10 @@ void Obj_Free(Allocator_t* alloc, Obj_t* obj)
     }
     break;
 
+    case OBJ_CLOSURE:
+        FREE(alloc, ObjClosure_t, obj);
+        break;
+
     case OBJ_STRING:
     {
         ObjString_t* str = (ObjString_t*)obj;
@@ -96,6 +100,14 @@ ObjFunction_t* ObjFun_Create(VMData_t* vmdata, line_t line)
     fun->name = NULL;
     Chunk_Init(&fun->chunk, vmdata->alloc, line);
     return fun;
+}
+
+
+ObjClosure_t* ObjCls_Create(VMData_t* vmdata, ObjFunction_t* fun)
+{
+    ObjClosure_t* closure = ALLOCATE_OBJ(vmdata, ObjClosure_t, OBJ_CLOSURE);
+    closure->fun = fun;
+    return closure;
 }
 
 
@@ -203,6 +215,10 @@ void Obj_Print(FILE* fout, const Value_t val)
 
     case OBJ_FUNCTION:
         print_function(fout, AS_FUNCTION(val));
+        break;
+    
+    case OBJ_CLOSURE:
+        print_function(fout, AS_CLOSURE(val)->fun);
         break;
 
     case OBJ_STRING:
