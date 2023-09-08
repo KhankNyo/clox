@@ -663,7 +663,9 @@ static void function(Compiler_t* compiler, FunctionType_t type)
 
                 uint8_t constant = parse_variable(compiler, "Expected parameter name.");
                 define_variable(compiler, constant);
-            } while (!match(compiler, TOKEN_RIGHT_PAREN));
+            } while (match(compiler, TOKEN_COMMA));
+
+            consume(compiler, TOKEN_RIGHT_PAREN, "Expected ')' after paramters.");
         }
         consume(compiler, TOKEN_LEFT_BRACE, "Expected '{' before function body.");
 
