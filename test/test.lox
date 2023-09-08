@@ -8,6 +8,3 @@ for (var i = 0; i < 10; i += 1)
     print f(i);
 
 
-fun fib(iter, n) { for (var i = 0; i < iter; i += 1) { var start = clock(); fib(n); print clock() - start; } } fun bench(iter, n) { for (var i = 0; i < iter; i += 1) { var start = clock(); fib(n); print clock() - start; } }
-
-

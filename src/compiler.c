@@ -555,7 +555,7 @@ static void declare_local(Compiler_t* compiler)
         return;
 
     Token_t* name = &compiler->parser.prev;
-    for (int i = compiler->data->local_count - 1; i >= 0; i++)
+    for (int i = compiler->data->local_count - 1; i >= 0; i--)
     {
         Local_t* local = &compiler->data->locals[i];
         if (LOCAL_DEFINED(local) && local->depth < compiler->data->scope_depth)
