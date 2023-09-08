@@ -566,7 +566,7 @@ static void declare_local(Compiler_t* compiler)
 
         if (identifiers_equal(local->name, *name))
         {
-            error(&compiler->parser, "Already a varibale with this name in this scope.");
+            error(&compiler->parser, "Already a varible with this name in this scope.");
         }
     }
 
