@@ -5,6 +5,7 @@
 *.swp
 bin
 obj
+compile_commands.json
 
 
 
