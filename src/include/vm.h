@@ -50,8 +50,10 @@ typedef enum InterpretResult_t
 
 
 
-/* initializes vm */
+/* initializes vm state and runtime objects like native functions */
 void VM_Init(VM_t* vm, Allocator_t* alloc);
+/* intializes vm's states only */
+void VM_Reset(VM_t* vm);
 /* free vm's data */
 void VM_Free(VM_t* vm);
 

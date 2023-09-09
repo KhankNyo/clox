@@ -19,6 +19,7 @@
 
 
 static InterpretResult_t run(VM_t* vm);
+static void init_state(VM_t* vm, Allocator_t* alloc);
 static void stack_reset(VM_t* vm);
 static Value_t peek(const VM_t* vm, int offset);
 static bool is_falsey(const Value_t val);
@@ -46,15 +47,15 @@ static bool call_native(VM_t* vm, ObjNativeFn_t* native, int argc);
 
 void VM_Init(VM_t* vm, Allocator_t* alloc)
 {
-    vm->data.head = NULL;
-    vm->data.alloc = alloc;
-    vm->frame_count = 0;
-
-    stack_reset(vm);
-    Table_Init(&vm->data.strings, alloc);
-    Table_Init(&vm->data.globals, alloc);
-
+    init_state(vm, alloc);
     CLOX_ASSERT(VM_DefineNative(vm, "clock", Native_Clock, 0));
+}
+
+void VM_Reset(VM_t* vm)
+{
+    VM_Free(vm);
+    Allocator_Defrag(vm->data.alloc, ALLOCATOR_DEFRAG_DEFAULT);
+    VM_Init(vm, vm->data.alloc);
 }
 
 
@@ -64,7 +65,7 @@ void VM_Free(VM_t* vm)
     VM_FreeObjects(&vm->data);
     Table_Free(&vm->data.strings);
     Table_Free(&vm->data.globals);
-    VM_Init(vm, vm->data.alloc);
+    init_state(vm, vm->data.alloc);
 }
 
 void VM_FreeObjects(VMData_t* data)
@@ -419,6 +420,24 @@ do{\
 #undef READ_SHORT
 #undef PUSH
 #undef GET_IP
+}
+
+
+
+
+
+
+
+
+static void init_state(VM_t* vm, Allocator_t* alloc)
+{
+    vm->data.head = NULL;
+    vm->data.alloc = alloc;
+    vm->frame_count = 0;
+
+    stack_reset(vm);
+    Table_Init(&vm->data.strings, alloc);
+    Table_Init(&vm->data.globals, alloc);
 }
 
 

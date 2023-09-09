@@ -40,9 +40,8 @@ typedef struct Allocator_t
 {
 	uint8_t* head;
 	bufsize_t capacity;
-	bufsize_t used_size;
-
 	FreeHeader_t* free_head;
+    bool auto_defrag;
 } Allocator_t;
 
 /* 
@@ -53,7 +52,8 @@ typedef struct Allocator_t
 void Allocator_Init(Allocator_t* allocator, bufsize_t capacity);
 
 /* 
- * free all memory allocated by the allocator 
+ * free ALL memory allocated by the allocator,
+ * even ones that have not been passed to Allocator_Free
  */
 void Allocator_KillEmAll(Allocator_t* allocator);
 
@@ -82,6 +82,21 @@ void Allocator_Free(Allocator_t* allocator, void* ptr);
  *   > 0     | ==oldsize | nop, returns NULL
  */
 void* Allocator_Reallocate(Allocator_t* allocator, void* ptr, bufsize_t oldsize, bufsize_t newsize);
+
+
+
+/* 
+ * defragments memory manually, 
+ * highly recommended to use in places that does not need to be performant
+ *
+ * NOTE: this function uses recursion to defrag memory,
+ *      so it is best to use a small number for num_pointers to prevent stack overflow
+ *
+ * if auto_defrag is true
+ *  this function is automatically called in Allocator_Alloc if it cannot find a free list of memory
+ */
+#define ALLOCATOR_DEFRAG_DEFAULT 16
+void Allocator_Defrag(Allocator_t* allocator, size_t num_pointers);
 
 
 

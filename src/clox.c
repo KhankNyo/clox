@@ -66,8 +66,7 @@ void Clox_Repl(Clox_t* clox)
         }
         else if (strncmp(line, "reset\n", sizeof("reset")) == 0)
         {
-            VM_Free(&clox->vm);
-            VM_Init(&clox->vm, &clox->alloc);
+            VM_Reset(&clox->vm);
             continue;
         }
 
