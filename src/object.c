@@ -108,7 +108,9 @@ ObjUpval_t* ObjUpv_Create(VMData_t* vmdata, Value_t* value)
 {
     ObjUpval_t* upval = ALLOCATE_OBJ(vmdata, ObjUpval_t, OBJ_UPVAL);
 
+    upval->closed = NIL_VAL();
     upval->location = value;
+    upval->next = NULL;
     return upval;
 }
 

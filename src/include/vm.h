@@ -16,6 +16,7 @@ struct VMData_t
     Allocator_t* alloc;
     Table_t strings;
     Table_t globals;
+    ObjUpval_t* open_upvals;
     Obj_t* head;
 };
 

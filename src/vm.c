@@ -39,7 +39,8 @@ static bool call(VM_t* vm, ObjClosure_t* closure, int argc);
 static bool call_native(VM_t* vm, ObjNativeFn_t* native, int argc);
 
 
-static ObjUpval_t* capture_upval(VMData_t* data, Value_t* local);
+static ObjUpval_t* capture_upval(VMData_t* data, Value_t* base);
+static void close_upval(VMData_t* vmdata, Value_t* sp);
 
 
 
@@ -414,9 +415,14 @@ do{\
             }
         }
         break;
+        case OP_CLOSE_UPVALUE:
+            close_upval(&vm->data, vm->sp - 1);
+            POP();
+            break;
         case OP_RETURN:
         {
             Value_t val = POP();
+            close_upval(&vm->data, current->base);
             vm->frame_count--;
             if (vm->frame_count == 0)
             {
@@ -459,6 +465,7 @@ do{\
 static void init_state(VM_t* vm, Allocator_t* alloc)
 {
     vm->data.head = NULL;
+    vm->data.open_upvals = NULL;
     vm->data.alloc = alloc;
     vm->frame_count = 0;
 
@@ -676,13 +683,47 @@ static bool call_native(VM_t* vm, ObjNativeFn_t* native, int argc)
 
 
 
-static ObjUpval_t* capture_upval(VMData_t* vmdata, Value_t* local)
+static ObjUpval_t* capture_upval(VMData_t* vmdata, Value_t* base)
 {
-    ObjUpval_t* new_upval = ObjUpv_Create(vmdata, local);
+    ObjUpval_t* prev = NULL;
+    ObjUpval_t* curr = vmdata->open_upvals;
+    while (NULL != curr && curr->location > base)
+    {
+        prev = curr;
+        curr = curr->next;
+    }
+
+    if (NULL != curr && base == curr->location)
+    {
+        return curr;
+    }
+
+
+    ObjUpval_t* new_upval = ObjUpv_Create(vmdata, base);
+    new_upval->next = curr;
+    if (NULL == prev)
+    {
+        vmdata->open_upvals = new_upval;
+    }
+    else
+    {
+        prev->next = new_upval;
+    }
     return new_upval;
 }
 
 
 
+static void close_upval(VMData_t* vmdata, Value_t* base)
+{
+    while (NULL != vmdata->open_upvals 
+        && vmdata->open_upvals->location >= base)
+    {
+        ObjUpval_t* upval = vmdata->open_upvals;
+        upval->closed = *upval->location;
+        upval->location = &upval->closed;
+        vmdata->open_upvals = upval->next;
+    }
+}
 
 

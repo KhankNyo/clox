@@ -417,7 +417,7 @@ static void set_header(FreeHeader_t* header, size_t capacity, FreeHeader_t* next
 
 static void dbg_print_nodes(const Allocator_t allocator, const char* title)
 {
-#ifdef DEBUG
+#ifdef ALLOCATOR_DEBUG
     fprintf(stdout, "\n <== ALLOCATOR: %s ==> \n", title);
     const FreeHeader_t* node = allocator.free_head;
     int indent = 0;

@@ -53,6 +53,7 @@ typedef struct Local_t
 {
     Token_t name;
     int depth;
+    bool is_captured;
 } Local_t;
 
 typedef struct Upval_t
@@ -208,6 +209,7 @@ static size_t emit_jump(Compiler_t* compiler, Opc_t jump_op);
 static void patch_jump(Compiler_t* compiler, size_t start);
 
 static void emit_loop(Compiler_t* compiler, size_t loop_head);
+static void emit_pop(Compiler_t* compiler, int num_popped);
 
 
 
@@ -400,6 +402,7 @@ static void compdat_init(Compiler_t* compiler, CompilerData_t* compdat, Function
         .name.start = "",
         .name.len = 0,
         .depth = 0,
+        .is_captured = false,
     };
 }
 
@@ -559,13 +562,14 @@ static int resolve_upval(CompilerData_t* data, Parser_t* parser, const Token_t n
     int index = resolve_local(data->next, parser, name);
     if (VAR_UNDEFINED != index)
     {
+        data->next->locals[index].is_captured = true;
         return add_upval(data, parser, index, true);
     }
 
     int upval = resolve_upval(data->next, parser, name);
     if (VAR_UNDEFINED != upval)
     {
-        return add_upval(data, parser, index, false);
+        return add_upval(data, parser, upval, false);
     }
 
     return VAR_UNDEFINED;
@@ -624,6 +628,7 @@ static void add_local(Compiler_t* compiler, const Token_t name)
 
     Local_t *local = &compiler->data->locals[compiler->data->local_count];
 
+    local->is_captured = false;
     local->name = name;
     local->depth = VAR_UNDEFINED;
     compiler->data->local_count += 1;
@@ -876,22 +881,24 @@ static void stmt_block(Compiler_t* compiler)
 
 static void scope_end(Compiler_t* compiler)
 {
-    compiler->data->scope_depth -= 1;
-    int popped_vars = 0;
+    CompilerData_t* data = compiler->data; /* ease typing */
+    data->scope_depth -= 1;
+    int num_popped = 0;
 
-    while (compiler->data->local_count > 0
-        && compiler->data->locals[compiler->data->local_count - 1].depth > compiler->data->scope_depth
+    while (data->local_count > 0
+        && data->locals[data->local_count - 1].depth > data->scope_depth
     )
     {
-        popped_vars += 1;
-        compiler->data->local_count -= 1;
+        if (data->locals[data->local_count - 1].is_captured)
+        {
+            emit_pop(compiler, num_popped);
+            emit_byte(compiler, OP_CLOSE_UPVALUE);
+            num_popped = -1;
+        }
+        num_popped += 1;
+        data->local_count -= 1;
     }
-
-
-    if (popped_vars == 1)
-        emit_byte(compiler, OP_POP);
-    else if (popped_vars != 0)
-        emit_2_bytes(compiler, OP_POPN, popped_vars);
+    emit_pop(compiler, num_popped);
 }
 
 
@@ -1375,6 +1382,24 @@ static void emit_loop(Compiler_t* compiler, size_t loop_head)
 
     emit_2_bytes(compiler, offset >> 8, offset);
 }
+
+
+static void emit_pop(Compiler_t* compiler, int num_popped)
+{
+    if (num_popped <= 0)
+        return;
+
+    if (num_popped > 1)
+    {
+        emit_2_bytes(compiler, OP_POPN, num_popped);
+    }
+    else
+    {
+        emit_byte(compiler, OP_POP);
+    }
+}
+
+
 
 
 

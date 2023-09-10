@@ -12,7 +12,7 @@ endif
 
 SRCS=$(wildcard src/*.c)
 OBJS=$(patsubst src/%.c,obj/%.o,$(SRCS))
-OUTPUT=bin/main$(EXEC_FMT)
+OUTPUT=bin/Lox$(EXEC_FMT)
 
 
 

@@ -58,6 +58,8 @@ typedef struct ObjUpval_t
     Obj_t obj;
 
     Value_t* location;
+    Value_t closed;
+    struct ObjUpval_t* next;
 } ObjUpval_t;
 
 typedef struct ObjFunction_t

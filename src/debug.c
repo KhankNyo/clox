@@ -195,7 +195,7 @@ size_t Disasm_Instruction(FILE* fout, const Chunk_t* chunk, size_t offset)
         offset++; /* skip instruction */
         uint8_t constant = chunk->code[offset++];
 
-        fprintf(fout, INS_FMTSTR"%4d", "OP_CLOSURE", constant);
+        fprintf(fout, INS_FMTSTR"%4d ", "OP_CLOSURE", constant);
         Value_Print(fout, chunk->consts.vals[constant]);
         fputc('\n', fout);
 
@@ -204,12 +204,15 @@ size_t Disasm_Instruction(FILE* fout, const Chunk_t* chunk, size_t offset)
         {
             uint8_t is_local = chunk->code[offset++];
             uint8_t index = chunk->code[offset++];
-            printf("%04d      |                     %s %d\n",
+            printf("%04d    |                       %s %d\n",
                 (int)offset - 2, is_local ? "local" : "upvalue", index
             );
         }
     }
     break;
+    case OP_CLOSE_UPVALUE:
+        offset = single_byte(fout, "OP_CLOSE_UPVALUE", offset);
+        break;
 
 
 
