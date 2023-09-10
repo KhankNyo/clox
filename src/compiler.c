@@ -55,6 +55,12 @@ typedef struct Local_t
     int depth;
 } Local_t;
 
+typedef struct Upval_t
+{
+    uint8_t index;
+    bool is_local;
+} Upval_t;
+
 
 typedef struct CompilerData_t
 {
@@ -64,6 +70,7 @@ typedef struct CompilerData_t
 
     int local_count;
     int scope_depth;
+    Upval_t upvals[UINT8_COUNT];
     Local_t locals[UINT8_COUNT];
 } CompilerData_t;
 
@@ -119,6 +126,8 @@ static size_t parse_variable(Compiler_t* compiler, const char* errmsg);
 /* emit a string in the constant table with the given identifier */
 static size_t identifier_constant(Compiler_t* compiler, const Token_t identifier);
 static bool identifiers_equal(const Token_t a, const Token_t b);
+static int resolve_local(CompilerData_t* data, Parser_t* parser, const Token_t name);
+static int resolve_upval(CompilerData_t* data, Parser_t* parser, const Token_t name);
 
 /* define a global variable */
 static void define_variable(Compiler_t* compiler, size_t global_index);
@@ -128,6 +137,9 @@ static void declare_local(Compiler_t* compiler);
 
 /* adds the previous token into the scope */
 static void add_local(Compiler_t* compiler, const Token_t name);
+
+/* adds an upvalue to the upvalue table */
+static int add_upval(CompilerData_t* data, Parser_t* parser, const uint8_t index, bool is_local);
 
 
 
@@ -520,22 +532,50 @@ static bool identifiers_equal(const Token_t a, const Token_t b)
 }
 
 
-static int resolve_local(Compiler_t* compiler, const Token_t name)
+static int resolve_local(CompilerData_t* data, Parser_t* parser, const Token_t name)
 {
-    for (int i = compiler->data->local_count - 1; i >= 0; i--)
+    for (int i = data->local_count - 1; i >= 0; i--)
     {
-        Local_t* local = &compiler->data->locals[i];
+        Local_t* local = &data->locals[i];
         if (identifiers_equal(local->name, name))
         {
             if (!LOCAL_DEFINED(local))
             {
-                error(&compiler->parser, "Can't read local variable in its own initializer.");
+                error(parser, "Can't read local variable in its own initializer.");
             }
             return i;
         }
     }
     return VAR_UNDEFINED;
 }
+
+
+
+static int resolve_upval(CompilerData_t* data, Parser_t* parser, const Token_t name)
+{
+    if (NULL == data->next)
+        return VAR_UNDEFINED;
+
+    int index = resolve_local(data->next, parser, name);
+    if (VAR_UNDEFINED != index)
+    {
+        return add_upval(data, parser, index, true);
+    }
+
+    int upval = resolve_upval(data->next, parser, name);
+    if (VAR_UNDEFINED != upval)
+    {
+        return add_upval(data, parser, index, false);
+    }
+
+    return VAR_UNDEFINED;
+}
+
+
+
+
+
+
 
 
 static void define_variable(Compiler_t* compiler, size_t global_index)
@@ -588,6 +628,37 @@ static void add_local(Compiler_t* compiler, const Token_t name)
     local->depth = VAR_UNDEFINED;
     compiler->data->local_count += 1;
 }
+
+
+
+static int add_upval(CompilerData_t* data, Parser_t* parser, const uint8_t index, bool is_local)
+{
+    int upval_count = data->fun->upval_count;
+
+    /* check to see if the variable is already there and return it */
+    for (int i = 0; i < upval_count; i++)
+    {
+        const Upval_t upval = data->upvals[i];
+        if (index == upval.index && is_local == upval.is_local)
+        {
+            return i;
+        }
+    }
+
+    if (upval_count >= UINT8_COUNT)
+    {
+        error(parser, "Too many closure variables in function.");
+        return 0;
+    }
+
+    data->upvals[upval_count].is_local = is_local;
+    data->upvals[upval_count].index = index;
+    return data->fun->upval_count++;
+}
+
+
+
+
 
 
 
@@ -675,7 +746,15 @@ static void function(Compiler_t* compiler, FunctionType_t type)
     // scope_end(compiler);
     ObjFunction_t* fun = compdat_end(compiler, &fundat);
     uint32_t fun_addr = Chunk_AddConstant(current_chunk(compiler), OBJ_VAL(fun));
+    
     emit_2_bytes(compiler, OP_CLOSURE, fun_addr);
+    for (int i = 0; i < fun->upval_count; i++)
+    {
+        emit_2_bytes(compiler, 
+            fundat.upvals[i].is_local,
+            fundat.upvals[i].index
+        );
+    }
 }
 
 
@@ -1056,17 +1135,22 @@ static void variable(Compiler_t* compiler, bool can_assign)
 static void named_variable(Compiler_t* compiler, const Token_t name, bool can_assign)
 {
     uint8_t get_op, set_op;
-    int arg = resolve_local(compiler, name);
-    if (VAR_UNDEFINED == arg) /* then is assumed to be global */
+    int arg = resolve_local(compiler->data, &compiler->parser, name);
+    if (VAR_UNDEFINED != arg) /* then is assumed to be global */
+    {
+        get_op = OP_GET_LOCAL;
+        set_op = OP_SET_LOCAL;
+    }
+    else if (VAR_UNDEFINED != (arg = resolve_upval(compiler->data, &compiler->parser, name)))
+    {
+        set_op = OP_SET_UPVALUE;
+        get_op = OP_GET_UPVALUE;
+    }
+    else 
     {
         arg = identifier_constant(compiler, name);
         get_op = OP_GET_GLOBAL;
         set_op = OP_SET_GLOBAL;
-    }
-    else 
-    {
-        get_op = OP_GET_LOCAL;
-        set_op = OP_SET_LOCAL;
     }
     
 

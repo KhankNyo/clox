@@ -39,6 +39,9 @@ static bool call(VM_t* vm, ObjClosure_t* closure, int argc);
 static bool call_native(VM_t* vm, ObjNativeFn_t* native, int argc);
 
 
+static ObjUpval_t* capture_upval(VMData_t* data, Value_t* local);
+
+
 
 
 
@@ -139,17 +142,6 @@ InterpretResult_t VM_Interpret(VM_t* vm, const char* src)
     return run(vm);
 }
 
-
-void VM_FreeObjs(VM_t* vm)
-{
-    Obj_t* node = vm->data.head;
-    while (NULL != node)
-    {
-        Obj_t* next = node->next;
-        Obj_Free(vm->data.alloc, node);
-        node = next;
-    }
-}
 
 
 
@@ -380,11 +372,46 @@ do{\
             }
         }
         break;
+
+        case OP_GET_UPVALUE:
+        {
+            uint8_t slot = READ_BYTE();
+            ObjUpval_t* upval = current->closure->upvals[slot];
+            PUSH(*upval->location);
+        }
+        break;
+        case OP_SET_UPVALUE:
+        {
+            uint8_t slot = READ_BYTE();
+            ObjUpval_t* upval = current->closure->upvals[slot];
+
+            /* does not pop because this instruction is only used in assignment expressions,
+             * and expressions do have return value in Lox,
+             * so if we pop it off, we'd need to push it back 
+             */
+            *upval->location = peek(vm, 0);
+        }
+        break;
         case OP_CLOSURE:
         {
             ObjFunction_t* fun = AS_FUNCTION(READ_CONSTANT());
             ObjClosure_t* closure = ObjCls_Create(&vm->data, fun);
             PUSH(OBJ_VAL(closure));
+
+            for (int i = 0; i < fun->upval_count; i++)
+            {
+                uint8_t is_local = READ_BYTE();
+                uint8_t slot = READ_BYTE();
+
+                if (is_local)
+                {
+                    closure->upvals[i] = capture_upval(&vm->data, current->base + slot);
+                }
+                else 
+                {
+                    closure->upvals[i] = current->closure->upvals[slot];
+                }
+            }
         }
         break;
         case OP_RETURN:
@@ -649,6 +676,11 @@ static bool call_native(VM_t* vm, ObjNativeFn_t* native, int argc)
 
 
 
+static ObjUpval_t* capture_upval(VMData_t* vmdata, Value_t* local)
+{
+    ObjUpval_t* new_upval = ObjUpv_Create(vmdata, local);
+    return new_upval;
+}
 
 
 

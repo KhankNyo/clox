@@ -58,8 +58,14 @@ void Obj_Free(Allocator_t* alloc, Obj_t* obj)
     break;
 
     case OBJ_CLOSURE:
-        FREE(alloc, ObjClosure_t, obj);
-        break;
+    {
+        ObjClosure_t* closure = (ObjClosure_t*)obj;
+        FREE_ARRAY(alloc, ObjUpval_t*, 
+            closure->upvals, closure->upval_count
+        );
+        FREE(alloc, ObjClosure_t, closure);
+    }
+    break;
 
     case OBJ_STRING:
     {
@@ -70,6 +76,10 @@ void Obj_Free(Allocator_t* alloc, Obj_t* obj)
         FREE(alloc, *str, str);
     }
     break;
+
+    case OBJ_UPVAL:
+        FREE(alloc, ObjUpval_t, obj);
+        break;
 
     default: CLOX_ASSERT(false && "Unhandled Obj_Free() case"); return;
     }
@@ -93,10 +103,23 @@ ObjNativeFn_t* ObjNFn_Create(VMData_t* vmdata, NativeFn_t fn, uint8_t arity)
 
 
 
+
+ObjUpval_t* ObjUpv_Create(VMData_t* vmdata, Value_t* value)
+{
+    ObjUpval_t* upval = ALLOCATE_OBJ(vmdata, ObjUpval_t, OBJ_UPVAL);
+
+    upval->location = value;
+    return upval;
+}
+
+
+
 ObjFunction_t* ObjFun_Create(VMData_t* vmdata)
 {
     ObjFunction_t* fun = ALLOCATE_OBJ(vmdata, ObjFunction_t, OBJ_FUNCTION);
+
     fun->arity = 0;
+    fun->upval_count = 0;
     fun->name = NULL;
     Chunk_Init(&fun->chunk, vmdata->alloc);
     return fun;
@@ -105,7 +128,16 @@ ObjFunction_t* ObjFun_Create(VMData_t* vmdata)
 
 ObjClosure_t* ObjCls_Create(VMData_t* vmdata, ObjFunction_t* fun)
 {
+    ObjUpval_t** upvals = ALLOCATE(vmdata->alloc, ObjUpval_t*, fun->upval_count);
+    for (int i = 0; i < fun->upval_count; i++)
+    {
+        upvals[i] = NULL; // again fuck the gc
+    }
+
     ObjClosure_t* closure = ALLOCATE_OBJ(vmdata, ObjClosure_t, OBJ_CLOSURE);
+
+    closure->upvals = upvals;
+    closure->upval_count = fun->upval_count;
     closure->fun = fun;
     return closure;
 }
@@ -223,6 +255,10 @@ void Obj_Print(FILE* fout, const Value_t val)
 
     case OBJ_STRING:
         fprintf(fout, "%s", AS_CSTR(val));
+        break;
+
+    case OBJ_UPVAL:
+        fprintf(fout, "upvalue");
         break;
     default: CLOX_ASSERT(false && "Unhandled Obj_Print() case"); break;
     }

@@ -25,6 +25,7 @@
 
 typedef enum ObjType_t
 {
+    OBJ_UPVAL,
     OBJ_STRING,
     OBJ_FUNCTION,
     OBJ_CLOSURE,
@@ -52,11 +53,19 @@ typedef struct ObjNativeFn_t
 
 
 
+typedef struct ObjUpval_t
+{
+    Obj_t obj;
+
+    Value_t* location;
+} ObjUpval_t;
+
 typedef struct ObjFunction_t
 {
     Obj_t obj;
 
     int arity;
+    int upval_count;
     Chunk_t chunk;
     ObjString_t* name;
 } ObjFunction_t;
@@ -64,7 +73,10 @@ typedef struct ObjFunction_t
 typedef struct ObjClosure_t
 {
     Obj_t obj;
+
     ObjFunction_t* fun;
+    ObjUpval_t** upvals;
+    int upval_count; // fuck gc
 } ObjClosure_t;
 
 
@@ -97,6 +109,13 @@ void Obj_Free(Allocator_t* alloc, Obj_t* obj);
  *  cleanup using Obj_Free()
  */
 ObjNativeFn_t* ObjNFn_Create(VMData_t* vmdata, NativeFn_t fn, uint8_t arity);
+
+
+/*
+ *  Creates a new ObjUpval_t from a value on the vm's stack
+ *  cleanup using Obj_Free()
+ */
+ObjUpval_t* ObjUpv_Create(VMData_t* vmdata, Value_t* value);
 
 /*
  *  Creates a new ObjFunction_t, cleanup using Obj_Free()

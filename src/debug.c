@@ -4,6 +4,7 @@
 
 #include "include/line.h"
 #include "include/chunk.h"
+#include "include/object.h"
 #include "include/debug.h"
 
 
@@ -183,6 +184,12 @@ size_t Disasm_Instruction(FILE* fout, const Chunk_t* chunk, size_t offset)
         offset = byte_instruction(fout, "OP_CALL", chunk, offset); 
         break;
 
+    case OP_SET_UPVALUE:
+        offset = byte_instruction(fout, "OP_SET_UPVALUE", chunk, offset);
+        break;
+    case OP_GET_UPVALUE:
+        offset = byte_instruction(fout, "OP_GET_UPVALUE", chunk, offset);
+        break;
     case OP_CLOSURE:
     {
         offset++; /* skip instruction */
@@ -191,6 +198,16 @@ size_t Disasm_Instruction(FILE* fout, const Chunk_t* chunk, size_t offset)
         fprintf(fout, INS_FMTSTR"%4d", "OP_CLOSURE", constant);
         Value_Print(fout, chunk->consts.vals[constant]);
         fputc('\n', fout);
+
+        const ObjFunction_t* fun = AS_FUNCTION(chunk->consts.vals[constant]);
+        for (int j = 0; j < fun->upval_count; j++)
+        {
+            uint8_t is_local = chunk->code[offset++];
+            uint8_t index = chunk->code[offset++];
+            printf("%04d      |                     %s %d\n",
+                (int)offset - 2, is_local ? "local" : "upvalue", index
+            );
+        }
     }
     break;
 
