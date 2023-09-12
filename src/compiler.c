@@ -83,6 +83,7 @@ typedef struct Compiler_t
 
     CompilerData_t* data;
 } Compiler_t;
+Compiler_t* s_compiler = NULL;
 
 
 
@@ -341,6 +342,19 @@ ObjFunction_t* Compile(VMData_t* data, const char* src)
 }
 
 
+void Compiler_MarkObj(void)
+{
+    if (NULL == s_compiler)
+        return;
+    CompilerData_t* compdat = s_compiler->data;
+    while (NULL != compdat)
+    {
+        GC_MarkObj(s_compiler->vmdata, (Obj_t*)compdat->fun);
+        compdat = compdat->next;
+    }
+}
+
+
 
 
 
@@ -364,12 +378,14 @@ static void compiler_init(Compiler_t* compiler, VMData_t* data, const char* src,
     compiler->vmdata = data;
     compiler->data = NULL;
 
+    s_compiler = compiler;
     advance(compiler);
     compdat_init(compiler, compdat, TYPE_SCRIPT);
 }
 
 static ObjFunction_t* compiler_end(Compiler_t* compiler)
 {
+    s_compiler = NULL;
     return compdat_end(compiler, compiler->data);
 }
 

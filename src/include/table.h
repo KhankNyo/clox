@@ -16,7 +16,7 @@ typedef struct Entry_t
 
 typedef struct Table_t
 {
-    Allocator_t* alloc;
+    VMData_t* vmdata;
     size_t count;
     size_t capacity;
     Entry_t* entries;
@@ -26,7 +26,7 @@ typedef struct Table_t
 /*
  *  Initializes the hash table
  */
-void Table_Init(Table_t* table, Allocator_t* alloc);
+void Table_Init(Table_t* table, VMData_t* vmdata);
 
 /*
  *  Frees the table itself, the keys and values are left in tact
@@ -84,6 +84,12 @@ ObjString_t* Table_FindStrs(Table_t* table,
         int substr_count, const ObjString_t* substr[static substr_count], 
         uint32_t hash, int total_len
 );
+
+
+/*
+ *  Marks any object that is in the table, both key and value
+ */
+void Table_MarkObj(Table_t* table);
 
 
 #endif /* _CLOX_TABLE_H_ */

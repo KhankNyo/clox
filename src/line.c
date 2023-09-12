@@ -29,10 +29,9 @@ void LineInfo_Write(LineInfo_t* li, size_t addr, line_t line)
 
 	if (li->count + 1 > li->capacity)
 	{
-		const size_t oldcap = li->capacity;
 		li->capacity = GROW_CAPACITY(li->capacity);
-		li->at = GROW_ARRAY(li->alloc, LineAddr_t, 
-			li->at, oldcap, li->capacity
+        li->at = Allocator_Realloc(li->alloc, li->at,
+            li->capacity * sizeof(li->at[0])
 		);
 	}
 
@@ -55,7 +54,9 @@ line_t LineInfo_GetLine(const LineInfo_t li, size_t addr)
 
     line_t i = 0;
     while (i < li.count && li.at[i].addr < addr)
+    {
         i++;
+    }
 
     return li.at[i - 1].line;
 }
@@ -63,7 +64,7 @@ line_t LineInfo_GetLine(const LineInfo_t li, size_t addr)
 
 void LineInfo_Free(LineInfo_t* li)
 {
-	FREE_ARRAY(li->alloc, LineAddr_t, li->at, li->capacity);
+    Allocator_Free(li->alloc, li->at);
 	LineInfo_Init(li, li->alloc);
 }
 

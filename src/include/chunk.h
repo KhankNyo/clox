@@ -6,6 +6,7 @@
 #include "common.h"
 #include "value.h"
 #include "memory.h"
+#include "typedefs.h"
 
 
 /* maximum number of constant a chunk can have */
@@ -56,7 +57,7 @@ typedef enum Opc_t
 
 typedef struct Chunk_t
 {
-	Allocator_t* alloc;
+    VMData_t* vmdata;
 	uint8_t* code;
 	size_t size;
 	size_t capacity;
@@ -67,7 +68,7 @@ typedef struct Chunk_t
 
 
 /* set all members to 0 */
-void Chunk_Init(Chunk_t* chunk, Allocator_t* alloc);
+void Chunk_Init(Chunk_t* chunk, VMData_t* vmdata);
 
 /* writes an op byte to the chunk's code */
 void Chunk_Write(Chunk_t* chunk, uint8_t byte, line_t line);

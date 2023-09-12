@@ -3,7 +3,7 @@
 
 
 #include "common.h"
-#include "memory.h"
+#include "typedefs.h"
 
 
 
@@ -32,7 +32,7 @@ typedef struct Value_t
 
 typedef struct
 {
-	Allocator_t* alloc;
+    VMData_t* vmdata;
 	size_t size;
 	size_t capacity;
 	Value_t* vals;
@@ -57,7 +57,7 @@ typedef struct
 #define IS_OBJ(value)		((value).type == VAL_OBJ)
 
 
-void ValArr_Init(ValueArr_t* valarr, Allocator_t* alloc);
+void ValArr_Init(ValueArr_t* valarr, VMData_t* vmdata);
 void ValArr_Write(ValueArr_t* valarr, Value_t val);
 bool ValArr_Find(const ValueArr_t* valarr, Value_t val, size_t* index_out);
 void ValArr_Free(ValueArr_t* valarr);

@@ -35,35 +35,30 @@ static uint32_t hash_str(const char* str, int len);
 
 
 
-void Obj_Free(Allocator_t* alloc, Obj_t* obj)
+void Obj_Free(VMData_t* vmdata, Obj_t* obj)
 {
-    if (NULL == obj)
-    {
-        return;
-    }
-
-
+    DEBUG_GC_PRINT("%p free type %d\n", (void*)obj, obj->type);
     switch (obj->type)
     {
     case OBJ_NATIVE:
-        FREE(alloc, ObjNativeFn_t, obj);
+        FREE(vmdata, ObjNativeFn_t, obj);
         break;
 
     case OBJ_FUNCTION:
     {
         ObjFunction_t* fun = (ObjFunction_t*)obj;
         Chunk_Free(&fun->chunk);
-        FREE(alloc, ObjFunction_t, fun);
+        FREE(vmdata, ObjFunction_t, fun);
     }
     break;
 
     case OBJ_CLOSURE:
     {
         ObjClosure_t* closure = (ObjClosure_t*)obj;
-        FREE_ARRAY(alloc, ObjUpval_t*, 
+        FREE_ARRAY(vmdata, ObjUpval_t*, 
             closure->upvals, closure->upval_count
         );
-        FREE(alloc, ObjClosure_t, closure);
+        FREE(vmdata, ObjClosure_t, closure);
     }
     break;
 
@@ -71,14 +66,14 @@ void Obj_Free(Allocator_t* alloc, Obj_t* obj)
     {
         ObjString_t* str = (ObjString_t*)obj;
 #ifndef OBJSTR_FLEXIBLE_ARR
-        FREE_ARRAY(alloc, *str->cstr, str->cstr, str->len + 1);
+        FREE_ARRAY(vmdata, char, str->cstr, str->len + 1);
 #endif 
-        FREE(alloc, *str, str);
+        FREE(vmdata, *str, str);
     }
     break;
 
     case OBJ_UPVAL:
-        FREE(alloc, ObjUpval_t, obj);
+        FREE(vmdata, ObjUpval_t, obj);
         break;
 
     default: CLOX_ASSERT(false && "Unhandled Obj_Free() case"); return;
@@ -123,14 +118,14 @@ ObjFunction_t* ObjFun_Create(VMData_t* vmdata)
     fun->arity = 0;
     fun->upval_count = 0;
     fun->name = NULL;
-    Chunk_Init(&fun->chunk, vmdata->alloc);
+    Chunk_Init(&fun->chunk, vmdata);
     return fun;
 }
 
 
 ObjClosure_t* ObjCls_Create(VMData_t* vmdata, ObjFunction_t* fun)
 {
-    ObjUpval_t** upvals = ALLOCATE(vmdata->alloc, ObjUpval_t*, fun->upval_count);
+    ObjUpval_t** upvals = ALLOCATE(vmdata, ObjUpval_t*, fun->upval_count);
     for (int i = 0; i < fun->upval_count; i++)
     {
         upvals[i] = NULL; // again fuck the gc
@@ -205,7 +200,7 @@ uint32_t ObjStr_HashStrs(int count, const ObjString_t* strings[static count])
 ObjString_t* ObjStr_Reserve(VMData_t* vmdata, int len)
 {
     ObjString_t* string = (ObjString_t*)allocate_obj(
-            vmdata, sizeof(*string) + len + 1, OBJ_STRING
+        vmdata, sizeof(*string) + len + 1, OBJ_STRING
     );
     string->len = len;
     return string;
@@ -306,10 +301,11 @@ static Obj_t* allocate_obj(VMData_t* vmdata, size_t nbytes, ObjType_t type)
 {
     Obj_t* obj = Allocator_Alloc(vmdata->alloc, nbytes);
     obj->type = type;
+    obj->is_marked = false;
 
     obj->next = vmdata->head;
     vmdata->head = obj;
-    
+    DEBUG_GC_PRINT("%p allocate %zu for %d\n", (void*)obj, nbytes, type);
     return obj;
 }
 

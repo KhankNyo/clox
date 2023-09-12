@@ -14,7 +14,7 @@
 #define _STR_EXPR(expr) #expr
 #define STR_EXPR(expr) _STR_EXPR(expr)
 
-#ifdef DEBUG
+#if defined(DEBUG) || defined(_DEBUG)
 #  define DEBUG_TRACE_EXECUTION
 #  define CLOX_ASSERT(debug_expression)                 \
     do{                                                 \
@@ -26,17 +26,29 @@
         }                                               \
     }while(0)
 
-#define DEBUG_PRINT_CODE
+#  define DEBUG_ALLOCATION_CHK
+#  define DEBUG_PRINT_CODE
+#  define DEBUG_STRESS_GC
+#  define DEBUG_LOG_GC
+#  define GC_LOG_FILE stderr
 
 #else
 /* the expression is still there because it may contain code that have effect */
 #  define CLOX_ASSERT(x) ((void)(x)) 
 #endif /* DEBUG */
 
-
 #define UINT8_COUNT (UINT8_MAX + 1)
-
 #define STATIC_ARRSZ(comptime_array) (sizeof(comptime_array) / sizeof(comptime_array[0])) 
+
+#ifdef DEBUG_LOG_GC
+#  define DEBUG_GC_PRINT(...) fprintf(GC_LOG_FILE, __VA_ARGS__)
+#else
+#  define DEBUG_GC_PRINT(...) (void)0
+#endif /* DEBUG_LOG_GC */
+
+
+/* number of call frames */
+#define VM_FRAMES_MAX 128
 
 
 

@@ -35,6 +35,7 @@ typedef enum ObjType_t
 struct Obj_t
 {
     ObjType_t type;
+    bool is_marked;
     Obj_t* next;
 };
 
@@ -100,7 +101,7 @@ struct ObjString_t
 /* 
  *  Free the obj pointer and the underlying object iself
  */
-void Obj_Free(Allocator_t* alloc, Obj_t* obj);
+void Obj_Free(VMData_t* vmdata, Obj_t* obj);
 
 
 

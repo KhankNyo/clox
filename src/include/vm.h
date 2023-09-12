@@ -7,38 +7,12 @@
 #include "memory.h"
 #include "table.h"
 #include "object.h"
-
-#define VM_FRAMES_MAX 128
-#define VM_STACK_MAX (VM_FRAMES_MAX*UINT8_COUNT)
-
-struct VMData_t
-{
-    Allocator_t* alloc;
-    Table_t strings;
-    Table_t globals;
-    ObjUpval_t* open_upvals;
-    Obj_t* head;
-};
+#include "vmdata.h"
 
 
 
-typedef struct CallFrame_t
-{
-    ObjClosure_t* closure;
-    uint8_t* ip;
-    Value_t* base;
-} CallFrame_t;
-
-typedef struct VM_t
-{
-    int frame_count;
-    Value_t* sp;
-
-    CallFrame_t frames[VM_FRAMES_MAX];
-    Value_t stack[VM_STACK_MAX];
-
-    VMData_t data;
-} VM_t;
+typedef VMData_t VM_t;
+#define VM_GET_DATA(p_vm) (*p_vm)
 
 typedef enum InterpretResult_t
 {

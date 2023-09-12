@@ -19,19 +19,19 @@ static inline bool is_empty(const Entry_t* entry);
 
 
 
-void Table_Init(Table_t* table, Allocator_t* alloc)
+void Table_Init(Table_t* table, VMData_t* vmdata)
 {
     table->count = 0;
     table->capacity = 0;
     table->entries = NULL;
-    table->alloc = alloc;
+    table->vmdata = vmdata;
 }
 
 
 void Table_Free(Table_t* table)
 {
-    FREE_ARRAY(table->alloc, Entry_t, table->entries, table->capacity);
-    Table_Init(table, table->alloc);
+    FREE_ARRAY(table->vmdata, Entry_t, table->entries, table->capacity);
+    Table_Init(table, table->vmdata);
 }
 
 
@@ -139,6 +139,18 @@ ObjString_t* Table_FindStr(Table_t* table, const char* cstr, int len, uint32_t h
 
 
 
+void Table_MarkObj(Table_t* table)
+{
+    for (size_t i = 0; i < table->capacity; i++)
+    {
+        Entry_t* entry = &table->entries[i];
+        GC_MarkObj(table->vmdata, (Obj_t*)entry->key);
+        GC_MarkVal(table->vmdata, entry->val);
+    }
+}
+
+
+
 
 ObjString_t* Table_FindStrs(Table_t* table, 
         int substr_count, const ObjString_t* substr[static substr_count], 
@@ -196,7 +208,7 @@ find_next:
 
 static void adjust_capacity(Table_t* table, size_t newcap)
 {
-    Entry_t* new_entries = ALLOCATE(table->alloc, Entry_t, newcap);
+    Entry_t* new_entries = ALLOCATE(table->vmdata, Entry_t, newcap);
     for (size_t i = 0; i < newcap; i++)
     {
         new_entries[i].key = NULL;
@@ -220,7 +232,7 @@ static void adjust_capacity(Table_t* table, size_t newcap)
     }
 
 
-    FREE_ARRAY(table->alloc, Entry_t, table->entries, table->capacity);
+    FREE_ARRAY(table->vmdata, Entry_t, table->entries, table->capacity);
 
     table->entries = new_entries;
     table->capacity = newcap;

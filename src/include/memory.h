@@ -2,28 +2,27 @@
 #define _CLOX_MEMORY_H_
 
 #include "common.h"
-
+#include "typedefs.h"
+#include "value.h"
 
 
 
 /* CLox macros */
 
-#define ALLOCATE(p_allocator, type, nbytes)\
-	Allocator_Reallocate(p_allocator, NULL, 0, sizeof(type) * nbytes)
+#define ALLOCATE(p_vmdata, type, nbytes)\
+	GC_Reallocate(p_vmdata, NULL, 0, sizeof(type) * nbytes)
 
-#define FREE(p_allocator, type, ptr)\
-	Allocator_Reallocate(p_allocator, ptr, sizeof(type), 0)
+#define FREE(p_vmdata, type, ptr)\
+	GC_Reallocate(p_vmdata, ptr, sizeof(type), 0)
 
 #define GROW_CAPACITY(cap)\
 	((cap) < 8 ? 8 : (cap) * 2)
 
-#define GROW_ARRAY(p_allocator, type, ptr, oldsize, newsize)\
-	Allocator_Reallocate(p_allocator, ptr, (oldsize) * (sizeof(type)), newsize * sizeof(type))
+#define GROW_ARRAY(p_vmdata, type, ptr, oldsize, newsize)\
+	GC_Reallocate(p_vmdata, ptr, (oldsize) * (sizeof(type)), newsize * sizeof(type))
 
-#define FREE_ARRAY(p_allocator, type, ptr, oldsize)\
-	Allocator_Reallocate(p_allocator, ptr, sizeof(type) * (oldsize), 0)
-
-
+#define FREE_ARRAY(p_vmdata, type, ptr, oldsize)\
+	GC_Reallocate(p_vmdata, ptr, sizeof(type) * (oldsize), 0)
 
 
 
@@ -31,7 +30,8 @@
 
 
 
-typedef struct FreeHeader_t FreeHeader_t;
+
+
 #ifndef bufsize_t
 	typedef size_t bufsize_t;	/* affects the header's size, is configurable */
 #endif /* bufsize_t */
@@ -67,13 +67,21 @@ void Allocator_KillEmAll(Allocator_t* allocator);
 void* Allocator_Alloc(Allocator_t* allocator, bufsize_t nbytes);
 
 /*
- *   frees a buffer returned by Allocator_Alloc
+ *   frees a buffer returned by Allocator_Alloc or Allocator_Realloc
  */
 void Allocator_Free(Allocator_t* allocator, void* ptr);
 
 
+/* 
+ *   resize the buffer given by this function or Allocator_Alloc
+ *   if NULL == ptr, return pointer given by Allocatro_Alloc, 
+ *   if 0 == newsize, acts like Allocator_Free and returns NULL
+ */
+void* Allocator_Realloc(Allocator_t* allocator, void* ptr, bufsize_t newsize);
 
-/* a wrapper around Allocator_Alloc and Allocator_Free
+
+
+/* a wrapper around Allocator_Realloc
  *   oldsize | newsize   | action
  *   0       | > 0       | Allocator_Alloc
  *   > 0     | 0         | Allocator_Free
@@ -81,7 +89,22 @@ void Allocator_Free(Allocator_t* allocator, void* ptr);
  *   > 0     | > oldsize | reallocates ptr, return the same or a new ptr to a buf with the requested size
  *   > 0     | ==oldsize | nop, returns NULL
  */
-void* Allocator_Reallocate(Allocator_t* allocator, void* ptr, bufsize_t oldsize, bufsize_t newsize);
+void* GC_Reallocate(VMData_t* vmdata, void* ptr, bufsize_t oldsize, bufsize_t newsize);
+
+
+/* Clox vm's gc
+ *  Searches for objects from root, and mark them as reachable
+ */
+void GC_CollectGarbage(VMData_t* vmdata);
+
+/* mark a value as reachable */
+void GC_MarkVal(VMData_t* vmdata, Value_t val);
+
+/* mark an object as reachable */
+void GC_MarkObj(VMData_t* vmdata, Obj_t* obj);
+
+
+
 
 
 

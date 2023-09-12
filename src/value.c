@@ -11,12 +11,12 @@
 
 
 
-void ValArr_Init(ValueArr_t* valarr, Allocator_t* alloc)
+void ValArr_Init(ValueArr_t* valarr, VMData_t* vmdata)
 {
 	valarr->size = 0;
 	valarr->capacity = 0;
 	valarr->vals = NULL;
-	valarr->alloc = alloc;
+	valarr->vmdata = vmdata;
 }
 
 
@@ -26,7 +26,7 @@ void ValArr_Write(ValueArr_t* valarr, Value_t val)
 	{
 		const size_t oldcap = valarr->capacity;
 		valarr->capacity = GROW_CAPACITY(valarr->capacity);
-		valarr->vals = GROW_ARRAY(valarr->alloc, Value_t, 
+		valarr->vals = GROW_ARRAY(valarr->vmdata, Value_t, 
 			valarr->vals, oldcap, valarr->capacity
 		);
 	}
@@ -57,8 +57,8 @@ bool ValArr_Find(const ValueArr_t* valarr, Value_t val, size_t* index_out)
 
 void ValArr_Free(ValueArr_t* valarr)
 {
-	FREE_ARRAY(valarr->alloc, Value_t, valarr->vals, valarr->capacity);
-	ValArr_Init(valarr, valarr->alloc);
+	FREE_ARRAY(valarr->vmdata, Value_t, valarr->vals, valarr->capacity);
+	ValArr_Init(valarr, valarr->vmdata);
 }
 
 
