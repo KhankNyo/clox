@@ -63,6 +63,10 @@ static void dbg_print_nodes(const Allocator_t allocator, const char* title);
 
 
 static void gc_mark_root(VMData_t* vmdata);
+static void gc_trace_references(VMData_t* vmdata);
+static void gc_blacken_obj(VMData_t* vmdata, Obj_t* obj);
+static void gc_mark_valarr(VMData_t* vmdata, ValueArr_t* va);
+static void gc_sweep(VMData_t* vmdata);
 
 #define GET_HEADER(ptr) (FreeHeader_t*)(((uint8_t*)(ptr)) - sizeof(FreeHeader_t))
 #define GET_PTR(header_ptr) (((uint8_t*)(header_ptr)) + sizeof(FreeHeader_t))
@@ -156,31 +160,6 @@ void* Allocator_Realloc(Allocator_t* allocator, void* ptr, bufsize_t newsize)
 
 
 
-void* GC_Reallocate(VMData_t* vmdata, void* ptr, bufsize_t oldsize, bufsize_t newsize)
-{
-    if (oldsize < newsize)
-    {
-#ifdef DEBUG_STRESS_GC
-        GC_CollectGarbage(vmdata);
-#endif /* DEBUG_STRESS_GC */
-    }
-
-    return Allocator_Realloc(vmdata->alloc, ptr, newsize);
-}
-
-
-void GC_CollectGarbage(VMData_t* vmdata)
-{
-    DEBUG_GC_PRINT("-- gc begin\n");
-
-    gc_mark_root(vmdata);
-
-    DEBUG_GC_PRINT("-- gc end\n");
-}
-
-
-
-
 
 void Allocator_Free(Allocator_t* allocator, void* ptr)
 {
@@ -232,6 +211,89 @@ void Allocator_Defrag(Allocator_t* allocator, size_t num_pointers)
 
     Allocator_Defrag(allocator, num_pointers - 1);
 }
+
+
+
+
+
+
+
+
+
+
+void* GC_Reallocate(VMData_t* vmdata, void* ptr, bufsize_t oldsize, bufsize_t newsize)
+{
+    if (oldsize < newsize)
+    {
+#ifdef DEBUG_STRESS_GC
+        GC_CollectGarbage(vmdata);
+#endif /* DEBUG_STRESS_GC */
+    }
+
+    return Allocator_Realloc(vmdata->alloc, ptr, newsize);
+}
+
+
+void GC_CollectGarbage(VMData_t* vmdata)
+{
+    DEBUG_GC_PRINT("-- gc begin\n");
+
+    gc_mark_root(vmdata);
+    gc_trace_references(vmdata);
+    Table_RemoveWhite(&vmdata->strings);
+    gc_sweep(vmdata);
+
+    DEBUG_GC_PRINT("-- gc end\n");
+}
+
+
+
+
+void GC_MarkVal(VMData_t* vmdata, Value_t val)
+{
+    if (IS_OBJ(val))
+    {
+        GC_MarkObj(vmdata, AS_OBJ(val));
+    }
+}
+
+
+void GC_MarkObj(VMData_t* vmdata, Obj_t* obj)
+{
+    if (NULL == obj || obj->is_marked)
+        return;
+
+#ifdef DEBUG_LOG_GC
+    fprintf(GC_LOG_FILE, "%p mark ", (void*)obj);
+    Value_Print(GC_LOG_FILE, OBJ_VAL(obj));
+    fputc('\n', GC_LOG_FILE);
+#endif /* DEBUG_LOG_GC */
+
+    obj->is_marked = true;
+    switch (obj->type)
+    {
+    case OBJ_NATIVE:
+    case OBJ_STRING:
+        return;
+    default: break;
+    }
+
+
+    if (vmdata->gray_count + 1 > vmdata->gray_capacity)
+    {
+        vmdata->gray_capacity = GROW_CAPACITY(vmdata->gray_capacity);
+        vmdata->gray_stack = Allocator_Realloc(vmdata->alloc, 
+            vmdata->gray_stack, vmdata->gray_capacity * sizeof(Obj_t*)
+        );
+    }
+    vmdata->gray_stack[vmdata->gray_count] = obj;
+    vmdata->gray_count += 1;
+}
+
+
+
+
+
 
 
 
@@ -492,34 +554,98 @@ static void gc_mark_root(VMData_t* vmdata)
     }
 
     Table_MarkObj(&vmdata->globals);
-    Compiler_MarkObj();
+    Compiler_MarkObj(vmdata->compiler);
 }
 
 
-void GC_MarkVal(VMData_t* vmdata, Value_t val)
+
+static void gc_trace_references(VMData_t* vmdata)
 {
-    if (IS_OBJ(val))
+    while (vmdata->gray_count > 0)
     {
-        GC_MarkObj(vmdata, AS_OBJ(val));
+        Obj_t* obj = vmdata->gray_stack[--vmdata->gray_count];
+        gc_blacken_obj(vmdata, obj);
     }
 }
 
 
-void GC_MarkObj(VMData_t* vmdata, Obj_t* obj)
+static void gc_blacken_obj(VMData_t* vmdata, Obj_t* obj)
 {
-    if (NULL == obj)
-        return;
-
 #ifdef DEBUG_LOG_GC
-    fprintf(GC_LOG_FILE, "%p mark ", (void*)obj);
-    Value_Print(GC_LOG_FILE, OBJ_VAL(obj));
-    fputc('\n', GC_LOG_FILE);
+    fprintf(stderr, "%p blacken ", (void*)obj);
+    Value_Print(stderr, OBJ_VAL(obj));
+    fputc(stderr, '\n');
 #endif /* DEBUG_LOG_GC */
 
-    obj->is_marked = true;
+    switch (obj->type)
+    {
+    case OBJ_STRING:
+    case OBJ_NATIVE:
+        break;
 
-
-
+    case OBJ_UPVAL:
+        GC_MarkVal(vmdata, ((ObjUpval_t*)obj)->closed);
+        break;
+    case OBJ_FUNCTION:
+    {
+        ObjFunction_t* fun = (ObjFunction_t*)obj;
+        GC_MarkObj(vmdata, (Obj_t*)fun->name);
+        gc_mark_valarr(vmdata, &fun->chunk.consts);
+    }
+    break;
+    case OBJ_CLOSURE:
+    {
+        ObjClosure_t* closure = (ObjClosure_t*)obj;
+        GC_MarkObj(vmdata, (Obj_t*)closure->fun);
+        for (size_t i = 0; i < closure->upval_count; i++)
+        {
+            GC_MarkObj(vmdata, (Obj_t*)closure->upvals[i]);
+        }
+    }
+    break;
+    }
 }
 
+
+static void gc_mark_valarr(VMData_t* vmdata, ValueArr_t* va)
+{
+    for (size_t i = 0; i < va->size; i++)
+    {
+        GC_MarkVal(vmdata, va->vals[i]);
+    }
+}
+
+
+
+static void gc_sweep(VMData_t* vmdata)
+{
+    Obj_t* prev = NULL;
+    Obj_t* curr = vmdata->head;
+    size_t freed_count = 0;
+    while (NULL != curr)
+    {
+        if (curr->is_marked) /* then advance */
+        {
+            curr->is_marked = false; /* for next sweep cycle */
+            prev = curr;
+            curr = curr->next;
+        }
+        else 
+        {
+            Obj_t* the_sinful = curr;
+
+            curr = curr->next;
+            if (NULL == prev)
+                vmdata->head = curr;
+            else
+                prev->next = curr;
+
+            Obj_Free(vmdata, the_sinful);
+            freed_count += 1;
+        }
+    }
+
+
+    Allocator_Defrag(vmdata->alloc, freed_count);
+}
 

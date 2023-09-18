@@ -66,10 +66,12 @@ void VM_Reset(VM_t* vm)
 
 void VM_Free(VM_t* vm)
 {
-    VM_FreeObjects(&VM_GET_DATA(vm));
-    Table_Free(&VM_GET_DATA(vm).strings);
-    Table_Free(&VM_GET_DATA(vm).globals);
-    init_state(vm, VM_GET_DATA(vm).alloc);
+    VMData_t* vmdata = &VM_GET_DATA(vm);
+    Allocator_Free(vmdata->alloc, vmdata->gray_stack);
+    VM_FreeObjects(vmdata);
+    Table_Free(&vmdata->strings);
+    Table_Free(&vmdata->globals);
+    init_state(vm, vmdata->alloc);
 }
 
 void VM_FreeObjects(VMData_t* data)
@@ -467,7 +469,12 @@ static void init_state(VM_t* vm, Allocator_t* alloc)
     VM_GET_DATA(vm).head = NULL;
     VM_GET_DATA(vm).open_upvals = NULL;
     VM_GET_DATA(vm).alloc = alloc;
+    VM_GET_DATA(vm).compiler = NULL;
     vm->frame_count = 0;
+
+    VM_GET_DATA(vm).gray_count = 0;
+    VM_GET_DATA(vm).gray_capacity = 0;
+    VM_GET_DATA(vm).gray_stack = NULL;
 
     stack_reset(vm);
     Table_Init(&VM_GET_DATA(vm).strings, &VM_GET_DATA(vm));
@@ -524,7 +531,7 @@ static void str_concatenate(VM_t* vm)
         ObjStr_Intern(&VM_GET_DATA(vm), result);
     }
 #else
-    buf = ALLOCATE(VM_GET_DATA(vm).alloc, char, len + 1);
+    buf = ALLOCATE(&VM_GET_DATA(vm), char, len + 1);
     
     memcpy(buf, str_a->cstr, str_a->len);
     memcpy(buf + str_a->len, str_b->cstr, str_b->len);

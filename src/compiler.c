@@ -75,15 +75,14 @@ typedef struct CompilerData_t
     Local_t locals[UINT8_COUNT];
 } CompilerData_t;
 
-typedef struct Compiler_t
+struct Compiler_t
 {
     VMData_t* vmdata;
     Scanner_t scanner;
     Parser_t parser;
 
     CompilerData_t* data;
-} Compiler_t;
-Compiler_t* s_compiler = NULL;
+};
 
 
 
@@ -342,14 +341,15 @@ ObjFunction_t* Compile(VMData_t* data, const char* src)
 }
 
 
-void Compiler_MarkObj(void)
+void Compiler_MarkObj(Compiler_t* compiler)
 {
-    if (NULL == s_compiler)
+    if (NULL == compiler)
         return;
-    CompilerData_t* compdat = s_compiler->data;
+
+    CompilerData_t* compdat = compiler->data;
     while (NULL != compdat)
     {
-        GC_MarkObj(s_compiler->vmdata, (Obj_t*)compdat->fun);
+        GC_MarkObj(compiler->vmdata, (Obj_t*)compdat->fun);
         compdat = compdat->next;
     }
 }
@@ -370,22 +370,23 @@ void Compiler_MarkObj(void)
 
 
 
-static void compiler_init(Compiler_t* compiler, VMData_t* data, const char* src, CompilerData_t* compdat)
+static void compiler_init(Compiler_t* compiler, VMData_t* vmdata, const char* src, CompilerData_t* compdat)
 {
     Scanner_Init(&compiler->scanner, src);
     compiler->parser.had_error = false;
     compiler->parser.panic_mode = false;
-    compiler->vmdata = data;
+    compiler->vmdata = vmdata;
     compiler->data = NULL;
 
-    s_compiler = compiler;
+    vmdata->compiler = compiler;
     advance(compiler);
     compdat_init(compiler, compdat, TYPE_SCRIPT);
 }
 
 static ObjFunction_t* compiler_end(Compiler_t* compiler)
 {
-    s_compiler = NULL;
+    VMData_t* vmdata = compiler->vmdata;
+    vmdata->compiler = NULL;
     return compdat_end(compiler, compiler->data);
 }
 

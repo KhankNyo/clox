@@ -149,6 +149,21 @@ void Table_MarkObj(Table_t* table)
     }
 }
 
+void Table_RemoveWhite(Table_t* table)
+{
+    for (size_t i = 0; i < table->capacity; i++)
+    {
+        Entry_t* entry = &table->entries[i];
+        if (NULL != entry->key && !entry->key->obj.is_marked)
+        {
+            Table_Delete(table, entry->key);
+        }
+    }
+}
+
+
+
+
 
 
 

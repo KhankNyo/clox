@@ -5,6 +5,7 @@
 #include "memory.h"
 #include "table.h"
 #include "object.h"
+#include "compiler.h"
 
 #define VM_STACK_MAX (UINT8_COUNT * VM_FRAMES_MAX)
 
@@ -25,6 +26,11 @@ struct VMData_t
     Table_t globals;
     ObjUpval_t* open_upvals;
     Obj_t* head;
+
+    int gray_count;
+    int gray_capacity;
+    Obj_t** gray_stack;
+    Compiler_t* compiler;
 
     Value_t* sp;
     int frame_count;

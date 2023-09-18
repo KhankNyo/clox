@@ -8,11 +8,11 @@
 #include "typedefs.h"
 
 
+typedef struct Compiler_t Compiler_t;
 
-ObjFunction_t* Compile(VMData_t* data, const char* src);
+ObjFunction_t* Compile(VMData_t* vmdata, const char* src);
 
-/* TODO: not use a static compiler? */
-void Compiler_MarkObj(void);
+void Compiler_MarkObj(Compiler_t* compiler);
 
 
 #endif /* _CLOX_COMPILER_H_ */

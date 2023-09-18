@@ -92,6 +92,12 @@ ObjString_t* Table_FindStrs(Table_t* table,
 void Table_MarkObj(Table_t* table);
 
 
+/* 
+ *  Removes any strings that were not marked during the GC's mark phase 
+ */
+void Table_RemoveWhite(Table_t* table);
+
+
 #endif /* _CLOX_TABLE_H_ */
 
 
