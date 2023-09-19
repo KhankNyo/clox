@@ -9,20 +9,22 @@
 
 /* CLox macros */
 
-#define ALLOCATE(p_vmdata, type, nbytes)\
-	GC_Reallocate(p_vmdata, NULL, 0, sizeof(type) * nbytes)
+#define GC_HEAP_GROW_FACTOR 2
 
-#define FREE(p_vmdata, type, ptr)\
-	GC_Reallocate(p_vmdata, ptr, sizeof(type), 0)
+#define ALLOCATE(p_vm, type, nbytes)\
+	GC_Reallocate(p_vm, NULL, 0, sizeof(type) * nbytes)
+
+#define FREE(p_vm, type, ptr)\
+	GC_Reallocate(p_vm, ptr, sizeof(type), 0)
 
 #define GROW_CAPACITY(cap)\
 	((cap) < 8 ? 8 : (cap) * 2)
 
-#define GROW_ARRAY(p_vmdata, type, ptr, oldsize, newsize)\
-	GC_Reallocate(p_vmdata, ptr, (oldsize) * (sizeof(type)), newsize * sizeof(type))
+#define GROW_ARRAY(p_vm, type, ptr, oldsize, newsize)\
+	GC_Reallocate(p_vm, ptr, (oldsize) * (sizeof(type)), newsize * sizeof(type))
 
-#define FREE_ARRAY(p_vmdata, type, ptr, oldsize)\
-	GC_Reallocate(p_vmdata, ptr, sizeof(type) * (oldsize), 0)
+#define FREE_ARRAY(p_vm, type, ptr, oldsize)\
+	GC_Reallocate(p_vm, ptr, sizeof(type) * (oldsize), 0)
 
 
 
@@ -89,19 +91,19 @@ void* Allocator_Realloc(Allocator_t* allocator, void* ptr, bufsize_t newsize);
  *   > 0     | > oldsize | reallocates ptr, return the same or a new ptr to a buf with the requested size
  *   > 0     | ==oldsize | nop, returns NULL
  */
-void* GC_Reallocate(VMData_t* vmdata, void* ptr, bufsize_t oldsize, bufsize_t newsize);
+void* GC_Reallocate(VM_t* vm, void* ptr, bufsize_t oldsize, bufsize_t newsize);
 
 
 /* Clox vm's gc
  *  Searches for objects from root, and mark them as reachable
  */
-void GC_CollectGarbage(VMData_t* vmdata);
+void GC_CollectGarbage(VM_t* vm);
 
 /* mark a value as reachable */
-void GC_MarkVal(VMData_t* vmdata, Value_t val);
+void GC_MarkVal(VM_t* vm, Value_t val);
 
 /* mark an object as reachable */
-void GC_MarkObj(VMData_t* vmdata, Obj_t* obj);
+void GC_MarkObj(VM_t* vm, Obj_t* obj);
 
 
 

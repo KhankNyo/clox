@@ -57,7 +57,7 @@ typedef enum Opc_t
 
 typedef struct Chunk_t
 {
-    VMData_t* vmdata;
+    VM_t* vm;
 	uint8_t* code;
 	size_t size;
 	size_t capacity;
@@ -68,7 +68,7 @@ typedef struct Chunk_t
 
 
 /* set all members to 0 */
-void Chunk_Init(Chunk_t* chunk, VMData_t* vmdata);
+void Chunk_Init(Chunk_t* chunk, VM_t* vm);
 
 /* writes an op byte to the chunk's code */
 void Chunk_Write(Chunk_t* chunk, uint8_t byte, line_t line);

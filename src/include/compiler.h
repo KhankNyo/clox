@@ -10,8 +10,7 @@
 
 typedef struct Compiler_t Compiler_t;
 
-ObjFunction_t* Compile(VMData_t* vmdata, const char* src);
-
+ObjFunction_t* Compile(VM_t* vmdata, const char* src);
 void Compiler_MarkObj(Compiler_t* compiler);
 
 

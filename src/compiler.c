@@ -77,7 +77,7 @@ typedef struct CompilerData_t
 
 struct Compiler_t
 {
-    VMData_t* vmdata;
+    VM_t* vm;
     Scanner_t scanner;
     Parser_t parser;
 
@@ -110,7 +110,7 @@ typedef struct ParseRule_t
 
 
 
-static void compiler_init(Compiler_t* compiler, VMData_t* data, const char* src, CompilerData_t* compdat);
+static void compiler_init(Compiler_t* compiler, VM_t* data, const char* src, CompilerData_t* compdat);
 static ObjFunction_t* compiler_end(Compiler_t* compiler);
 static void compdat_init(Compiler_t* compiler, CompilerData_t* compdat, FunctionType_t type);
 static ObjFunction_t* compdat_end(Compiler_t* compiler, CompilerData_t* compdat);
@@ -321,7 +321,7 @@ static const ParseRule_t s_rules[] =
 
 
 
-ObjFunction_t* Compile(VMData_t* data, const char* src)
+ObjFunction_t* Compile(VM_t* data, const char* src)
 {
     Compiler_t compiler;
     CompilerData_t compdat;
@@ -349,7 +349,7 @@ void Compiler_MarkObj(Compiler_t* compiler)
     CompilerData_t* compdat = compiler->data;
     while (NULL != compdat)
     {
-        GC_MarkObj(compiler->vmdata, (Obj_t*)compdat->fun);
+        GC_MarkObj(compiler->vm, (Obj_t*)compdat->fun);
         compdat = compdat->next;
     }
 }
@@ -370,23 +370,23 @@ void Compiler_MarkObj(Compiler_t* compiler)
 
 
 
-static void compiler_init(Compiler_t* compiler, VMData_t* vmdata, const char* src, CompilerData_t* compdat)
+static void compiler_init(Compiler_t* compiler, VM_t* vm, const char* src, CompilerData_t* compdat)
 {
     Scanner_Init(&compiler->scanner, src);
     compiler->parser.had_error = false;
     compiler->parser.panic_mode = false;
-    compiler->vmdata = vmdata;
+    compiler->vm = vm;
     compiler->data = NULL;
 
-    vmdata->compiler = compiler;
+    vm->compiler = compiler;
     advance(compiler);
     compdat_init(compiler, compdat, TYPE_SCRIPT);
 }
 
 static ObjFunction_t* compiler_end(Compiler_t* compiler)
 {
-    VMData_t* vmdata = compiler->vmdata;
-    vmdata->compiler = NULL;
+    VM_t* vm = compiler->vm;
+    vm->compiler = NULL;
     return compdat_end(compiler, compiler->data);
 }
 
@@ -402,10 +402,10 @@ static void compdat_init(Compiler_t* compiler, CompilerData_t* compdat, Function
 
 
     compdat->fun = NULL;
-    compdat->fun = ObjFun_Create(compiler->vmdata);
+    compdat->fun = ObjFun_Create(compiler->vm);
     if (type != TYPE_SCRIPT)
     {
-        compdat->fun->name = ObjStr_Copy(compiler->vmdata, 
+        compdat->fun->name = ObjStr_Copy(compiler->vm, 
             compiler->parser.prev.start, 
             compiler->parser.prev.len
         );
@@ -536,7 +536,7 @@ static void mark_initialized(Compiler_t* compiler)
 static size_t identifier_constant(Compiler_t* compiler, const Token_t token)
 {
     return Chunk_AddUniqueConstant(current_chunk(compiler), 
-        OBJ_VAL(ObjStr_Copy(compiler->vmdata, token.start, token.len))
+        OBJ_VAL(ObjStr_Copy(compiler->vm, token.start, token.len))
     ); 
 }
 
@@ -1060,7 +1060,7 @@ static void string(Compiler_t* compiler, bool can_assign)
 {
     (void)can_assign;
     emit_constant(compiler, 
-        OBJ_VAL(ObjStr_Copy(compiler->vmdata, 
+        OBJ_VAL(ObjStr_Copy(compiler->vm, 
             /* not including '"' in string literals */
             compiler->parser.prev.start + 1, compiler->parser.prev.len - 2))
     );

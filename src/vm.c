@@ -39,8 +39,8 @@ static bool call(VM_t* vm, ObjClosure_t* closure, int argc);
 static bool call_native(VM_t* vm, ObjNativeFn_t* native, int argc);
 
 
-static ObjUpval_t* capture_upval(VMData_t* data, Value_t* base);
-static void close_upval(VMData_t* vmdata, Value_t* sp);
+static ObjUpval_t* capture_upval(VM_t* data, Value_t* base);
+static void close_upval(VM_t* vm, Value_t* sp);
 
 
 
@@ -58,23 +58,22 @@ void VM_Init(VM_t* vm, Allocator_t* alloc)
 void VM_Reset(VM_t* vm)
 {
     VM_Free(vm);
-    Allocator_Defrag(VM_GET_DATA(vm).alloc, ALLOCATOR_DEFRAG_DEFAULT);
-    VM_Init(vm, VM_GET_DATA(vm).alloc);
+    Allocator_Defrag(vm->alloc, ALLOCATOR_DEFRAG_DEFAULT);
+    VM_Init(vm, vm->alloc);
 }
 
 
 
 void VM_Free(VM_t* vm)
 {
-    VMData_t* vmdata = &VM_GET_DATA(vm);
-    Allocator_Free(vmdata->alloc, vmdata->gray_stack);
-    VM_FreeObjects(vmdata);
-    Table_Free(&vmdata->strings);
-    Table_Free(&vmdata->globals);
-    init_state(vm, vmdata->alloc);
+    Allocator_Free(vm->alloc, vm->gray_stack);
+    VM_FreeObjects(vm);
+    Table_Free(&vm->strings);
+    Table_Free(&vm->globals);
+    init_state(vm, vm->alloc);
 }
 
-void VM_FreeObjects(VMData_t* data)
+void VM_FreeObjects(VM_t* data)
 {
     Obj_t* node = data->head;
     while (NULL != node)
@@ -88,41 +87,48 @@ void VM_FreeObjects(VMData_t* data)
 
 bool VM_Push(VM_t* vm, Value_t val)
 {
-    if (VM_GET_DATA(vm).sp >= &VM_GET_DATA(vm).stack[VM_STACK_MAX])
+    if (vm->sp >= &vm->stack[VM_STACK_MAX])
     {
         runtime_error(vm, "Stack overflow.");
         return false;
     }
-    *VM_GET_DATA(vm).sp = val;
-    VM_GET_DATA(vm).sp++;
+    *vm->sp = val;
+    vm->sp++;
     return true;
 }
 
 
 Value_t VM_Pop(VM_t* vm)
 {
-    CLOX_ASSERT(VM_GET_DATA(vm).sp >= VM_GET_DATA(vm).stack);
-    VM_GET_DATA(vm).sp--;
-    return *VM_GET_DATA(vm).sp;
+    CLOX_ASSERT(vm->sp >= vm->stack);
+    vm->sp--;
+    return *vm->sp;
 }
 
 
 
 bool VM_DefineNative(VM_t* vm, const char* name, NativeFn_t fn, uint8_t argc)
 {
-    if (!VM_Push(vm, OBJ_VAL(ObjStr_Copy(&VM_GET_DATA(vm), name, strlen(name)))))
+    ObjString_t* fn_name = ObjStr_Copy(vm, name, strlen(name));
+
+    if (!VM_Push(vm, OBJ_VAL(fn_name)))
+    {
         return false;
-    if (!VM_Push(vm, OBJ_VAL(ObjNFn_Create(&VM_GET_DATA(vm), fn, argc))))
+    }
+
+    ObjNativeFn_t* fn_native = ObjNFn_Create(vm, fn, argc);
+    if (!VM_Push(vm, OBJ_VAL(fn_native)))
     {
         VM_Pop(vm);
         return false;
     }
 
-    Table_Set(&VM_GET_DATA(vm).globals, 
-        AS_STR(peek(vm, 1)), peek(vm, 0)
+    Table_Set(&vm->globals, 
+        AS_STR(peek(vm, 1)), 
+        peek(vm, 0)
     );
 
-    VM_GET_DATA(vm).sp -= 2;
+    vm->sp -= 2;
     return true;
 }
 
@@ -130,14 +136,13 @@ bool VM_DefineNative(VM_t* vm, const char* name, NativeFn_t fn, uint8_t argc)
 
 InterpretResult_t VM_Interpret(VM_t* vm, const char* src)
 {
-    CLOX_ASSERT(NULL != VM_GET_DATA(vm).sp && "call VM_Init before passing it to VM_Interpret.");
-
-    ObjFunction_t* fun = Compile(&VM_GET_DATA(vm), src);
+    CLOX_ASSERT(NULL != vm->sp && "call VM_Init before passing it to VM_Interpret.");
+    ObjFunction_t* fun = Compile(vm, src);
     if (NULL == fun)
         return INTERPRET_COMPILE_ERROR;
 
     VM_Push(vm, OBJ_VAL(fun));
-    ObjClosure_t* script = ObjCls_Create(&VM_GET_DATA(vm), fun);
+    ObjClosure_t* script = ObjCls_Create(vm, fun);
     VM_Pop(vm);
     VM_Push(vm, OBJ_VAL(script));
 
@@ -199,7 +204,7 @@ do{\
     do {\
         ObjString_t* name = macro_read_str();\
         Value_t val;\
-        if (!Table_Get(&VM_GET_DATA(vm).globals, name, &val)) {\
+        if (!Table_Get(&vm->globals, name, &val)) {\
             runtime_error(vm, "Undefined variable: '%s'.", name->cstr);\
             return INTERPRET_RUNTIME_ERROR;\
         }\
@@ -209,8 +214,8 @@ do{\
 #define SET_GLOBAL(macro_read_str) \
     do {\
         ObjString_t* name = macro_read_str();\
-        if (Table_Set(&VM_GET_DATA(vm).globals, name, peek(vm, 0))) {\
-            Table_Delete(&VM_GET_DATA(vm).globals, name);\
+        if (Table_Set(&vm->globals, name, peek(vm, 0))) {\
+            Table_Delete(&vm->globals, name);\
             runtime_error(vm, "Undefined variable: '%s'.", name->cstr);\
             return INTERPRET_RUNTIME_ERROR;\
         }\
@@ -238,7 +243,7 @@ do{\
     while (true)
     {
         debug_trace_execution(vm);
-        CLOX_ASSERT(VM_GET_DATA(vm).sp >= &VM_GET_DATA(vm).stack[0]);
+        CLOX_ASSERT(vm->sp >= &vm->stack[0]);
         uint8_t ins = READ_BYTE();
 
         switch (ins)
@@ -304,19 +309,19 @@ do{\
         break;
 
         case OP_POP:        POP(); break;
-        case OP_POPN:       VM_GET_DATA(vm).sp -= READ_BYTE(); break;
+        case OP_POPN:       vm->sp -= READ_BYTE(); break;
 
         case OP_DEFINE_GLOBAL_LONG:
         {
             ObjString_t* name = READ_STR_LONG();
-            Table_Set(&VM_GET_DATA(vm).globals, name, peek(vm, 0));
+            Table_Set(&vm->globals, name, peek(vm, 0));
             POP();
         }
         break;
         case OP_DEFINE_GLOBAL:
         {
             ObjString_t* name = READ_STR();
-            Table_Set(&VM_GET_DATA(vm).globals, name, peek(vm, 0));
+            Table_Set(&vm->globals, name, peek(vm, 0));
             POP();
         }
         break;
@@ -398,7 +403,7 @@ do{\
         case OP_CLOSURE:
         {
             ObjFunction_t* fun = AS_FUNCTION(READ_CONSTANT());
-            ObjClosure_t* closure = ObjCls_Create(&VM_GET_DATA(vm), fun);
+            ObjClosure_t* closure = ObjCls_Create(vm, fun);
             PUSH(OBJ_VAL(closure));
 
             for (int i = 0; i < fun->upval_count; i++)
@@ -408,7 +413,7 @@ do{\
 
                 if (is_local)
                 {
-                    closure->upvals[i] = capture_upval(&VM_GET_DATA(vm), current->base + slot);
+                    closure->upvals[i] = capture_upval(vm, current->base + slot);
                 }
                 else 
                 {
@@ -418,13 +423,13 @@ do{\
         }
         break;
         case OP_CLOSE_UPVALUE:
-            close_upval(&VM_GET_DATA(vm), VM_GET_DATA(vm).sp - 1);
+            close_upval(vm, vm->sp - 1);
             POP();
             break;
         case OP_RETURN:
         {
             Value_t val = POP();
-            close_upval(&VM_GET_DATA(vm), current->base);
+            close_upval(vm, current->base);
             vm->frame_count--;
             if (vm->frame_count == 0)
             {
@@ -432,7 +437,7 @@ do{\
                 return INTERPRET_OK;
             }
 
-            VM_GET_DATA(vm).sp = current->base;
+            vm->sp = current->base;
             PUSH(val);
             current = peek_cf(vm, 0);
         }
@@ -466,33 +471,37 @@ do{\
 
 static void init_state(VM_t* vm, Allocator_t* alloc)
 {
-    VM_GET_DATA(vm).head = NULL;
-    VM_GET_DATA(vm).open_upvals = NULL;
-    VM_GET_DATA(vm).alloc = alloc;
-    VM_GET_DATA(vm).compiler = NULL;
+    vm->head = NULL;
+    vm->open_upvals = NULL;
+    vm->alloc = alloc;
+    vm->compiler = NULL;
     vm->frame_count = 0;
 
-    VM_GET_DATA(vm).gray_count = 0;
-    VM_GET_DATA(vm).gray_capacity = 0;
-    VM_GET_DATA(vm).gray_stack = NULL;
+    vm->gray_count = 0;
+    vm->gray_capacity = 0;
+    vm->gray_stack = NULL;
+
+    vm->bytes_allocated = 0;
+    vm->next_gc = 1;
+
 
     stack_reset(vm);
-    Table_Init(&VM_GET_DATA(vm).strings, &VM_GET_DATA(vm));
-    Table_Init(&VM_GET_DATA(vm).globals, &VM_GET_DATA(vm));
+    Table_Init(&vm->strings, vm);
+    Table_Init(&vm->globals, vm);
 }
 
 
 static void stack_reset(VM_t* vm)
 {
-    VM_GET_DATA(vm).sp = &VM_GET_DATA(vm).stack[0];
+    vm->sp = &vm->stack[0];
     vm->frame_count = 0;
 }
 
 
 static Value_t peek(const VM_t* vm, int offset)
 {
-    CLOX_ASSERT(VM_GET_DATA(vm).sp >= VM_GET_DATA(vm).stack && "peek");
-    return VM_GET_DATA(vm).sp[-1 - offset];
+    CLOX_ASSERT(vm->sp >= vm->stack && "peek");
+    return vm->sp[-1 - offset];
 }
 
 
@@ -508,8 +517,8 @@ static bool is_falsey(const Value_t val)
 
 static void str_concatenate(VM_t* vm)
 {
-    ObjString_t* str_b = AS_STR(VM_Pop(vm));
-    ObjString_t* str_a = AS_STR(VM_Pop(vm));
+    ObjString_t* str_b = AS_STR(peek(vm, 0));
+    ObjString_t* str_a = AS_STR(peek(vm, 1));
     ObjString_t* result = NULL;
     int len = str_b->len + str_a->len;
     char* buf = NULL;
@@ -518,28 +527,30 @@ static void str_concatenate(VM_t* vm)
     const ObjString_t* strs[] = {str_a, str_b};
 
     uint32_t hash = ObjStr_HashStrs(2, strs); 
-    result = Table_FindStrs(&VM_GET_DATA(vm).strings, 2, strs, hash, len);
+    result = Table_FindStrs(&vm->strings, 2, strs, hash, len);
     if (NULL == result)
     {
-        result = ObjStr_Reserve(&VM_GET_DATA(vm), len);
+        result = ObjStr_Reserve(vm, len);
         buf = result->cstr;
 
         memcpy(buf, str_a->cstr, str_a->len);
         memcpy(buf + str_a->len, str_b->cstr, str_b->len);
         buf[len] = '\0';
 
-        ObjStr_Intern(&VM_GET_DATA(vm), result);
+        ObjStr_Intern(vm, result);
     }
 #else
-    buf = ALLOCATE(&VM_GET_DATA(vm), char, len + 1);
+    buf = ALLOCATE(vm, char, len + 1);
     
     memcpy(buf, str_a->cstr, str_a->len);
     memcpy(buf + str_a->len, str_b->cstr, str_b->len);
     buf[len] = '\0';
     
-    result = ObjStr_Steal(&VM_GET_DATA(vm), buf, len);
+    result = ObjStr_Steal(vm, buf, len);
 #endif /* OBJSTR_FLEXIBLE_ARR */
 
+    VM_Pop(vm);
+    VM_Pop(vm);
     VM_Push(vm, OBJ_VAL(result));
 }
 
@@ -573,7 +584,7 @@ static void debug_trace_execution(const VM_t* vm)
     const CallFrame_t* current = &vm->frames[vm->frame_count - 1];
 
     fprintf(stderr, "          ");
-    for (const Value_t* slot = VM_GET_DATA(vm).stack; slot < VM_GET_DATA(vm).sp; slot++) 
+    for (const Value_t* slot = vm->stack; slot < vm->sp; slot++) 
     {
         fprintf(stderr, "[ ");
         Value_Print(stderr, *slot);
@@ -668,7 +679,7 @@ static bool call(VM_t* vm, ObjClosure_t* closure, int argc)
     CallFrame_t* current = &vm->frames[vm->frame_count++];
     current->closure = closure;
     current->ip = closure->fun->chunk.code;
-    current->base = VM_GET_DATA(vm).sp - argc - 1;
+    current->base = vm->sp - argc - 1;
     return true;
 }
 
@@ -681,19 +692,19 @@ static bool call_native(VM_t* vm, ObjNativeFn_t* native, int argc)
         return false;
     }
 
-    Value_t* base_args = VM_GET_DATA(vm).sp - argc;
+    Value_t* base_args = vm->sp - argc;
     Value_t ret = native->fn(argc, base_args);
-    VM_GET_DATA(vm).sp = base_args;
-    VM_GET_DATA(vm).sp[-1] = ret;
+    vm->sp = base_args;
+    vm->sp[-1] = ret;
     return true;
 }
 
 
 
-static ObjUpval_t* capture_upval(VMData_t* vmdata, Value_t* base)
+static ObjUpval_t* capture_upval(VM_t* vm, Value_t* base)
 {
     ObjUpval_t* prev = NULL;
-    ObjUpval_t* curr = vmdata->open_upvals;
+    ObjUpval_t* curr = vm->open_upvals;
     while (NULL != curr && curr->location > base)
     {
         prev = curr;
@@ -706,11 +717,11 @@ static ObjUpval_t* capture_upval(VMData_t* vmdata, Value_t* base)
     }
 
 
-    ObjUpval_t* new_upval = ObjUpv_Create(vmdata, base);
+    ObjUpval_t* new_upval = ObjUpv_Create(vm, base);
     new_upval->next = curr;
     if (NULL == prev)
     {
-        vmdata->open_upvals = new_upval;
+        vm->open_upvals = new_upval;
     }
     else
     {
@@ -721,15 +732,15 @@ static ObjUpval_t* capture_upval(VMData_t* vmdata, Value_t* base)
 
 
 
-static void close_upval(VMData_t* vmdata, Value_t* base)
+static void close_upval(VM_t* vm, Value_t* base)
 {
-    while (NULL != vmdata->open_upvals 
-        && vmdata->open_upvals->location >= base)
+    while (NULL != vm->open_upvals 
+        && vm->open_upvals->location >= base)
     {
-        ObjUpval_t* upval = vmdata->open_upvals;
+        ObjUpval_t* upval = vm->open_upvals;
         upval->closed = *upval->location;
         upval->location = &upval->closed;
-        vmdata->open_upvals = upval->next;
+        vm->open_upvals = upval->next;
     }
 }
 

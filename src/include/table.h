@@ -16,7 +16,7 @@ typedef struct Entry_t
 
 typedef struct Table_t
 {
-    VMData_t* vmdata;
+    VM_t* vm;
     size_t count;
     size_t capacity;
     Entry_t* entries;
@@ -26,7 +26,7 @@ typedef struct Table_t
 /*
  *  Initializes the hash table
  */
-void Table_Init(Table_t* table, VMData_t* vmdata);
+void Table_Init(Table_t* table, VM_t* vm);
 
 /*
  *  Frees the table itself, the keys and values are left in tact
@@ -50,6 +50,8 @@ bool Table_Get(Table_t* table, const ObjString_t* key, Value_t* val_out);
  *  \returns true if the key did not exist before, an entry will be created with the given key
  *  \returns false if the key already exist, the value associated with the key will be overwritten 
  *  to hold the given key and value
+ *
+ *  NOTE: the key will be pushed onto the vm's stack and then popped if the table resizes
  */
 bool Table_Set(Table_t* table, ObjString_t* key, Value_t val);
 
@@ -81,15 +83,15 @@ ObjString_t* Table_FindStr(Table_t* table, const char* cstr, int len, uint32_t h
  *  \returns a pointer to the entry's key if found
  */
 ObjString_t* Table_FindStrs(Table_t* table, 
-        int substr_count, const ObjString_t* substr[static substr_count], 
-        uint32_t hash, int total_len
+    int substr_count, const ObjString_t* substr[static substr_count], 
+    uint32_t hash, int total_len
 );
 
 
 /*
  *  Marks any object that is in the table, both key and value
  */
-void Table_MarkObj(Table_t* table);
+void Table_Mark(Table_t* table);
 
 
 /* 

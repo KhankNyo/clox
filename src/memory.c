@@ -62,13 +62,13 @@ static void set_header(FreeHeader_t* header, size_t capacity, FreeHeader_t* next
 static void dbg_print_nodes(const Allocator_t allocator, const char* title);
 
 
-static void gc_mark_root(VMData_t* vmdata);
-static void gc_trace_references(VMData_t* vmdata);
-static void gc_blacken_obj(VMData_t* vmdata, Obj_t* obj);
-static void gc_mark_valarr(VMData_t* vmdata, ValueArr_t* va);
-static void gc_sweep(VMData_t* vmdata);
+static void gc_mark_root(VM_t* vm);
+static void gc_trace_references(VM_t* vm);
+static void gc_blacken_obj(VM_t* vm, Obj_t* obj);
+static void gc_mark_valarr(VM_t* vm, ValueArr_t* va);
+static void gc_sweep(VM_t* vm);
 
-#define GET_HEADER(ptr) (FreeHeader_t*)(((uint8_t*)(ptr)) - sizeof(FreeHeader_t))
+#define GET_HEADER(ptr) ((FreeHeader_t*)(((uint8_t*)(ptr)) - sizeof(FreeHeader_t)))
 #define GET_PTR(header_ptr) (((uint8_t*)(header_ptr)) + sizeof(FreeHeader_t))
 
 #define MIN_SIZE 8
@@ -114,8 +114,10 @@ void Allocator_KillEmAll(Allocator_t* allocator)
 
 void* Allocator_Alloc(Allocator_t* allocator, bufsize_t nbytes)
 {
-    dbg_print_nodes(*allocator, "Allocating");
 	FreeHeader_t* node = get_free_node(allocator, nbytes);
+
+    DEBUG_ALLOC_PRINT("\nAllocated pointer: %p, size: %u", GET_PTR(node), (unsigned)node->capacity);
+    dbg_print_nodes(*allocator, "Allocating");
 	if (NULL == node)
 	{
 		fprintf(stderr, 
@@ -185,8 +187,12 @@ void Allocator_Free(Allocator_t* allocator, void* ptr)
         );
 		abort();
 	}
+    fprintf(stderr, "freed content: %*.x\n", GET_HEADER(ptr)->capacity, ptr);
+    memset(ptr, 0, GET_HEADER(ptr)->capacity);
 #endif /* DEBUG_ALLOCATION_CHK */
 
+
+    DEBUG_ALLOC_PRINT("\nFreeing pointer: %p, size: %u", ptr, (unsigned)(GET_HEADER(ptr)->capacity));
     dbg_print_nodes(*allocator, "Freeing");
 	insert_free_node(allocator, GET_HEADER(ptr));
 }
@@ -221,44 +227,63 @@ void Allocator_Defrag(Allocator_t* allocator, size_t num_pointers)
 
 
 
-void* GC_Reallocate(VMData_t* vmdata, void* ptr, bufsize_t oldsize, bufsize_t newsize)
+void* GC_Reallocate(VM_t* vm, void* ptr, bufsize_t oldsize, bufsize_t newsize)
 {
+    vm->bytes_allocated += newsize - oldsize;
     if (oldsize < newsize)
     {
 #ifdef DEBUG_STRESS_GC
-        GC_CollectGarbage(vmdata);
+        GC_CollectGarbage(vm);
 #endif /* DEBUG_STRESS_GC */
+        if (vm->bytes_allocated > vm->next_gc)
+        {
+            GC_CollectGarbage(vm);
+        }
     }
 
-    return Allocator_Realloc(vmdata->alloc, ptr, newsize);
+
+    if (0 == newsize)
+    {
+        Allocator_Free(vm->alloc, ptr);
+        return NULL;
+    }
+    return Allocator_Realloc(vm->alloc, ptr, newsize);
 }
 
 
-void GC_CollectGarbage(VMData_t* vmdata)
+void GC_CollectGarbage(VM_t* vm)
 {
     DEBUG_GC_PRINT("-- gc begin\n");
 
-    gc_mark_root(vmdata);
-    gc_trace_references(vmdata);
-    Table_RemoveWhite(&vmdata->strings);
-    gc_sweep(vmdata);
+    size_t before_gc = vm->bytes_allocated;
+
+    gc_mark_root(vm);
+    gc_trace_references(vm);
+    Table_RemoveWhite(&vm->strings);
+    gc_sweep(vm);
+    vm->next_gc = vm->bytes_allocated * GC_HEAP_GROW_FACTOR;
 
     DEBUG_GC_PRINT("-- gc end\n");
+    DEBUG_GC_PRINT("   collected %zu bytes (from %zu to %zu) next at %zu\n",
+        before_gc - vm->bytes_allocated, 
+        before_gc, vm->bytes_allocated,
+        vm->next_gc
+    );
 }
 
 
 
 
-void GC_MarkVal(VMData_t* vmdata, Value_t val)
+void GC_MarkVal(VM_t* vm, Value_t val)
 {
     if (IS_OBJ(val))
     {
-        GC_MarkObj(vmdata, AS_OBJ(val));
+        GC_MarkObj(vm, AS_OBJ(val));
     }
 }
 
 
-void GC_MarkObj(VMData_t* vmdata, Obj_t* obj)
+void GC_MarkObj(VM_t* vm, Obj_t* obj)
 {
     if (NULL == obj || obj->is_marked)
         return;
@@ -279,15 +304,15 @@ void GC_MarkObj(VMData_t* vmdata, Obj_t* obj)
     }
 
 
-    if (vmdata->gray_count + 1 > vmdata->gray_capacity)
+    if (vm->gray_count + 1 > vm->gray_capacity)
     {
-        vmdata->gray_capacity = GROW_CAPACITY(vmdata->gray_capacity);
-        vmdata->gray_stack = Allocator_Realloc(vmdata->alloc, 
-            vmdata->gray_stack, vmdata->gray_capacity * sizeof(Obj_t*)
+        vm->gray_capacity = GROW_CAPACITY(vm->gray_capacity);
+        vm->gray_stack = Allocator_Realloc(vm->alloc, 
+            vm->gray_stack, vm->gray_capacity * sizeof(Obj_t*)
         );
     }
-    vmdata->gray_stack[vmdata->gray_count] = obj;
-    vmdata->gray_count += 1;
+    vm->gray_stack[vm->gray_count] = obj;
+    vm->gray_count += 1;
 }
 
 
@@ -408,6 +433,11 @@ static FreeHeader_t* get_free_node(Allocator_t* allocator, bufsize_t nbytes)
 }
 
 
+void panic()
+{
+    CLOX_ASSERT(false && "panic");
+}
+
 
 static void insert_free_node(Allocator_t* allocator, FreeHeader_t* node)
 {
@@ -429,7 +459,11 @@ static void insert_free_node(Allocator_t* allocator, FreeHeader_t* node)
 		prev = curr;
 		curr = curr->next;
 	}
-	CLOX_ASSERT(curr != node && "double free");
+    if (curr == node)
+    {
+        panic();
+        CLOX_ASSERT(curr != node && "double free");
+    }
 
 
     if (NULL == curr)
@@ -534,72 +568,72 @@ static void dbg_print_nodes(const Allocator_t allocator, const char* title)
 
 
 
-static void gc_mark_root(VMData_t* vmdata)
+static void gc_mark_root(VM_t* vm)
 {
-    for (Value_t* val = vmdata->stack; val < vmdata->sp; val++)
+    for (Value_t* val = vm->stack; val < vm->sp; val++)
     {
-        GC_MarkVal(vmdata, *val);
+        GC_MarkVal(vm, *val);
     }
 
-    for (int i = 0; i < vmdata->frame_count; i++)
+    for (int i = 0; i < vm->frame_count; i++)
     {
-        GC_MarkObj(vmdata, (Obj_t*)vmdata->frames[i].closure);
+        GC_MarkObj(vm, (Obj_t*)vm->frames[i].closure);
     }
 
-    for (ObjUpval_t* upval = vmdata->open_upvals; 
+    for (ObjUpval_t* upval = vm->open_upvals; 
         NULL != upval; 
         upval = upval->next)
     {
-        GC_MarkObj(vmdata, (Obj_t*)upval);
+        GC_MarkObj(vm, (Obj_t*)upval);
     }
 
-    Table_MarkObj(&vmdata->globals);
-    Compiler_MarkObj(vmdata->compiler);
+    Table_Mark(&vm->globals);
+    Compiler_MarkObj(vm->compiler);
 }
 
 
 
-static void gc_trace_references(VMData_t* vmdata)
+static void gc_trace_references(VM_t* vm)
 {
-    while (vmdata->gray_count > 0)
+    while (vm->gray_count > 0)
     {
-        Obj_t* obj = vmdata->gray_stack[--vmdata->gray_count];
-        gc_blacken_obj(vmdata, obj);
+        Obj_t* obj = vm->gray_stack[--vm->gray_count];
+        gc_blacken_obj(vm, obj);
     }
 }
 
 
-static void gc_blacken_obj(VMData_t* vmdata, Obj_t* obj)
+static void gc_blacken_obj(VM_t* vm, Obj_t* obj)
 {
 #ifdef DEBUG_LOG_GC
     fprintf(stderr, "%p blacken ", (void*)obj);
     Value_Print(stderr, OBJ_VAL(obj));
-    fputc(stderr, '\n');
+    fputc('\n', stderr);
 #endif /* DEBUG_LOG_GC */
 
     switch (obj->type)
     {
-    case OBJ_STRING:
     case OBJ_NATIVE:
+    case OBJ_STRING:
         break;
 
     case OBJ_UPVAL:
-        GC_MarkVal(vmdata, ((ObjUpval_t*)obj)->closed);
+        GC_MarkVal(vm, ((ObjUpval_t*)obj)->closed);
         break;
     case OBJ_FUNCTION:
     {
         ObjFunction_t* fun = (ObjFunction_t*)obj;
-        GC_MarkObj(vmdata, (Obj_t*)fun->name);
-        gc_mark_valarr(vmdata, &fun->chunk.consts);
+        GC_MarkObj(vm, (Obj_t*)fun->name);
+        gc_mark_valarr(vm, &fun->chunk.consts);
     }
     break;
     case OBJ_CLOSURE:
     {
         ObjClosure_t* closure = (ObjClosure_t*)obj;
-        GC_MarkObj(vmdata, (Obj_t*)closure->fun);
-        for (size_t i = 0; i < closure->upval_count; i++)
+        GC_MarkObj(vm, (Obj_t*)closure->fun);
+        for (int i = 0; i < closure->upval_count; i++)
         {
-            GC_MarkObj(vmdata, (Obj_t*)closure->upvals[i]);
+            GC_MarkObj(vm, (Obj_t*)closure->upvals[i]);
         }
     }
     break;
@@ -607,20 +641,20 @@ static void gc_blacken_obj(VMData_t* vmdata, Obj_t* obj)
 }
 
 
-static void gc_mark_valarr(VMData_t* vmdata, ValueArr_t* va)
+static void gc_mark_valarr(VM_t* vm, ValueArr_t* va)
 {
     for (size_t i = 0; i < va->size; i++)
     {
-        GC_MarkVal(vmdata, va->vals[i]);
+        GC_MarkVal(vm, va->vals[i]);
     }
 }
 
 
 
-static void gc_sweep(VMData_t* vmdata)
+static void gc_sweep(VM_t* vm)
 {
     Obj_t* prev = NULL;
-    Obj_t* curr = vmdata->head;
+    Obj_t* curr = vm->head;
     size_t freed_count = 0;
     while (NULL != curr)
     {
@@ -636,16 +670,16 @@ static void gc_sweep(VMData_t* vmdata)
 
             curr = curr->next;
             if (NULL == prev)
-                vmdata->head = curr;
+                vm->head = curr;
             else
                 prev->next = curr;
 
-            Obj_Free(vmdata, the_sinful);
+            Obj_Free(vm, the_sinful);
             freed_count += 1;
         }
     }
 
 
-    Allocator_Defrag(vmdata->alloc, freed_count);
+    Allocator_Defrag(vm->alloc, freed_count);
 }
 

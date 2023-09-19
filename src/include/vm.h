@@ -7,12 +7,8 @@
 #include "memory.h"
 #include "table.h"
 #include "object.h"
-#include "vmdata.h"
+#include "compiler.h"
 
-
-
-typedef VMData_t VM_t;
-#define VM_GET_DATA(p_vm) (*p_vm)
 
 typedef enum InterpretResult_t
 {
@@ -20,6 +16,41 @@ typedef enum InterpretResult_t
     INTERPRET_COMPILE_ERROR,
     INTERPRET_RUNTIME_ERROR,
 } InterpretResult_t;
+
+
+#define VM_STACK_MAX (UINT8_COUNT * VM_FRAMES_MAX)
+
+typedef struct CallFrame_t
+{
+    ObjClosure_t* closure;
+    uint8_t* ip;
+    Value_t* base;
+} CallFrame_t;
+
+
+struct VM_t
+{
+    Allocator_t* alloc;
+    Table_t strings;
+    Table_t globals;
+    ObjUpval_t* open_upvals;
+    Obj_t* head;
+
+    int gray_count;
+    int gray_capacity;
+    Obj_t** gray_stack;
+
+    size_t bytes_allocated;
+    size_t next_gc;
+
+    Value_t* sp;
+    int frame_count;
+
+    Value_t stack[VM_STACK_MAX];
+    CallFrame_t frames[VM_FRAMES_MAX];
+    Compiler_t* compiler;
+};
+
 
 
 
@@ -63,7 +94,7 @@ InterpretResult_t VM_Interpret(VM_t* vm, const char* src);
 
 
 /* free VMData_t, automatically called by VM_Free */
-void VM_FreeObjects(VMData_t* data);
+void VM_FreeObjects(VM_t* data);
 
 
 #endif /* _CLOX_VM_H_ */

@@ -8,6 +8,7 @@
 #include "include/value.h"
 #include "include/object.h"
 #include "include/memory.h"
+#include "include/vm.h"
 
 
 #define TABLE_MAX_LOAD 3/4
@@ -19,19 +20,19 @@ static inline bool is_empty(const Entry_t* entry);
 
 
 
-void Table_Init(Table_t* table, VMData_t* vmdata)
+void Table_Init(Table_t* table, VM_t* vm)
 {
     table->count = 0;
     table->capacity = 0;
     table->entries = NULL;
-    table->vmdata = vmdata;
+    table->vm = vm;
 }
 
 
 void Table_Free(Table_t* table)
 {
-    FREE_ARRAY(table->vmdata, Entry_t, table->entries, table->capacity);
-    Table_Init(table, table->vmdata);
+    FREE_ARRAY(table->vm, Entry_t, table->entries, table->capacity);
+    Table_Init(table, table->vm);
 }
 
 
@@ -75,9 +76,14 @@ bool Table_Set(Table_t* table, ObjString_t* key, Value_t val)
 {
     if (table->count + 1 > table->capacity * TABLE_MAX_LOAD)
     {
+        VM_Push(table->vm, OBJ_VAL(key));
+
         size_t capacity = GROW_CAPACITY(table->capacity);
         adjust_capacity(table, capacity);
+
+        VM_Pop(table->vm);
     }
+
 
     Entry_t *entry = find_entry(table->entries, table->capacity, key);
     bool is_new_key = entry->key == NULL;
@@ -139,13 +145,13 @@ ObjString_t* Table_FindStr(Table_t* table, const char* cstr, int len, uint32_t h
 
 
 
-void Table_MarkObj(Table_t* table)
+void Table_Mark(Table_t* table)
 {
     for (size_t i = 0; i < table->capacity; i++)
     {
         Entry_t* entry = &table->entries[i];
-        GC_MarkObj(table->vmdata, (Obj_t*)entry->key);
-        GC_MarkVal(table->vmdata, entry->val);
+        GC_MarkObj(table->vm, (Obj_t*)entry->key);
+        GC_MarkVal(table->vm, entry->val);
     }
 }
 
@@ -223,7 +229,7 @@ find_next:
 
 static void adjust_capacity(Table_t* table, size_t newcap)
 {
-    Entry_t* new_entries = ALLOCATE(table->vmdata, Entry_t, newcap);
+    Entry_t* new_entries = ALLOCATE(table->vm, Entry_t, newcap);
     for (size_t i = 0; i < newcap; i++)
     {
         new_entries[i].key = NULL;
@@ -247,7 +253,7 @@ static void adjust_capacity(Table_t* table, size_t newcap)
     }
 
 
-    FREE_ARRAY(table->vmdata, Entry_t, table->entries, table->capacity);
+    FREE_ARRAY(table->vm, Entry_t, table->entries, table->capacity);
 
     table->entries = new_entries;
     table->capacity = newcap;

@@ -101,7 +101,7 @@ struct ObjString_t
 /* 
  *  Free the obj pointer and the underlying object iself
  */
-void Obj_Free(VMData_t* vmdata, Obj_t* obj);
+void Obj_Free(VM_t* vm, Obj_t* obj);
 
 
 
@@ -111,24 +111,24 @@ void Obj_Free(VMData_t* vmdata, Obj_t* obj);
  *  Creates a new ObjNativeFn_t from a C function pointer and its arity (arg count),
  *  cleanup using Obj_Free()
  */
-ObjNativeFn_t* ObjNFn_Create(VMData_t* vmdata, NativeFn_t fn, uint8_t arity);
+ObjNativeFn_t* ObjNFn_Create(VM_t* vm, NativeFn_t fn, uint8_t arity);
 
 
 /*
  *  Creates a new ObjUpval_t from a value on the vm's stack
  *  cleanup using Obj_Free()
  */
-ObjUpval_t* ObjUpv_Create(VMData_t* vmdata, Value_t* value);
+ObjUpval_t* ObjUpv_Create(VM_t* vm, Value_t* value);
 
 /*
  *  Creates a new ObjFunction_t, cleanup using Obj_Free()
  */
-ObjFunction_t* ObjFun_Create(VMData_t* vmdata);
+ObjFunction_t* ObjFun_Create(VM_t* vm);
 
 /*
  *  wraps a function around a closure object, cleanup using Obj_Free()
  */
-ObjClosure_t* ObjCls_Create(VMData_t* vmdata, ObjFunction_t* fun);
+ObjClosure_t* ObjCls_Create(VM_t* vm, ObjFunction_t* fun);
 
 
 
@@ -136,7 +136,7 @@ ObjClosure_t* ObjCls_Create(VMData_t* vmdata, ObjFunction_t* fun);
  *  Creates a new ObjString_t object by copying the cstr given
  *  \returns a pointer to the newly created ObjString_t object
  */
-ObjString_t* ObjStr_Copy(VMData_t* vmdata, const char* cstr, int len);
+ObjString_t* ObjStr_Copy(VM_t* vm, const char* cstr, int len);
 
 /*
  *  \returns the hash of multiple strings, the given strings are treated as one
@@ -149,27 +149,27 @@ uint32_t ObjStr_HashStrs(int count, const ObjString_t* strings[static count]);
      *  Creates a new ObjString_t object and reserve len + 1 bytes of memory
      *  \returns a pointer to the newly created ObjString_t object
      */
-    ObjString_t* ObjStr_Reserve(VMData_t* vmdata, int len);
+    ObjString_t* ObjStr_Reserve(VM_t* vm, int len);
 
     /* 
-     *  Hashes the given string, and set it in the vmdata's string table if
+     *  Hashes the given string, and set it in the vm's string table if
      *  the string did not exist before
      *  \returns true if the string already exist in the string table
      *  \returns false otherwise
      */
-    bool ObjStr_Intern(VMData_t* vmdata, ObjString_t* string);
+    bool ObjStr_Intern(VM_t* vm, ObjString_t* string);
 #else
 
     /*
      *  steals the pointer to the heapstr, 
-     *  if the heapstr already existed in vmdata's string table,
-     *      the heapstr is freed and the string in vmdata's string table is returned
+     *  if the heapstr already existed in vm's string table,
+     *      the heapstr is freed and the string in vm's string table is returned
      *  else 
-     *      allocate a new ObjString_t object, set it in vmdata's string table and then return it
-     *  \returns the string in vmdata's string table if it already exist
+     *      allocate a new ObjString_t object, set it in vm's string table and then return it
+     *  \returns the string in vm's string table if it already exist
      *  \returns the newly allocated string otherwise 
      */
-    ObjString_t* ObjStr_Steal(VMData_t* vmdata, char* heapstr, int len);
+    ObjString_t* ObjStr_Steal(VM_t* vm, char* heapstr, int len);
 #endif /* OBJSTR_FLEXIBLE_ARR */
 
 

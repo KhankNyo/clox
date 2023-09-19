@@ -7,16 +7,17 @@
 #include "include/memory.h"
 #include "include/value.h"
 #include "include/object.h"
+#include "include/vm.h"
 
 
 
 
-void ValArr_Init(ValueArr_t* valarr, VMData_t* vmdata)
+void ValArr_Init(ValueArr_t* valarr, VM_t* vm)
 {
 	valarr->size = 0;
 	valarr->capacity = 0;
 	valarr->vals = NULL;
-	valarr->vmdata = vmdata;
+	valarr->vm = vm;
 }
 
 
@@ -24,11 +25,15 @@ void ValArr_Write(ValueArr_t* valarr, Value_t val)
 {
 	if (valarr->size + 1 > valarr->capacity)
 	{
+        VM_Push(valarr->vm, val);
+
 		const size_t oldcap = valarr->capacity;
 		valarr->capacity = GROW_CAPACITY(valarr->capacity);
-		valarr->vals = GROW_ARRAY(valarr->vmdata, Value_t, 
+		valarr->vals = GROW_ARRAY(valarr->vm, Value_t, 
 			valarr->vals, oldcap, valarr->capacity
 		);
+
+        VM_Pop(valarr->vm);
 	}
 
 	valarr->vals[valarr->size] = val;
@@ -57,8 +62,8 @@ bool ValArr_Find(const ValueArr_t* valarr, Value_t val, size_t* index_out)
 
 void ValArr_Free(ValueArr_t* valarr)
 {
-	FREE_ARRAY(valarr->vmdata, Value_t, valarr->vals, valarr->capacity);
-	ValArr_Init(valarr, valarr->vmdata);
+	FREE_ARRAY(valarr->vm, Value_t, valarr->vals, valarr->capacity);
+	ValArr_Init(valarr, valarr->vm);
 }
 
 
