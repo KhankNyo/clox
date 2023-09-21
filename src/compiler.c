@@ -386,8 +386,10 @@ static void compiler_init(Compiler_t* compiler, VM_t* vm, const char* src, Compi
 static ObjFunction_t* compiler_end(Compiler_t* compiler)
 {
     VM_t* vm = compiler->vm;
+    /* fuck gc, 2 days pulling my hair out just to change 2 LOC's */
+    ObjFunction_t* fun = compdat_end(compiler, compiler->data);
     vm->compiler = NULL;
-    return compdat_end(compiler, compiler->data);
+    return fun;
 }
 
 
