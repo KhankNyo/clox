@@ -43,6 +43,10 @@ static ObjUpval_t* capture_upval(VM_t* data, Value_t* base);
 static void close_upval(VM_t* vm, Value_t* sp);
 
 
+static void define_method(VM_t* vm, ObjString_t* class_name);
+static bool bind_method(VM_t* vm, ObjClass_t* klass, ObjString_t* name);
+
+
 
 
 
@@ -237,8 +241,8 @@ do{\
             PUSH(field_val);\
             break;\
         }\
-        runtime_error(vm, "Undefined property '%s'.", name->cstr);\
-        return INTERPRET_RUNTIME_ERROR;\
+        if (!bind_method(vm, inst->klass, name))\
+            return INTERPRET_RUNTIME_ERROR;\
     } while (0)
 
 #define SET_PROPERTY(readstr_macro)\
@@ -500,6 +504,12 @@ do{\
         }
         break;
 
+        case OP_METHOD:
+        {
+            define_method(vm, READ_STR());
+        }
+        break;
+
 
         
         default: break;
@@ -515,8 +525,13 @@ do{\
 #undef READ_BYTE
 #undef READ_LONG
 #undef READ_SHORT
+#undef POP
 #undef PUSH
 #undef GET_IP
+#undef GET_PROPERTY
+#undef SET_PROPERTY
+#undef GET_GLOBAL
+#undef SET_GLOBAL
 }
 
 
@@ -714,6 +729,14 @@ static bool call_value(VM_t* vm, Value_t callee, int argc)
         return true;
     }
     break;
+    case OBJ_BOUND_METHOD:
+    {
+        ObjBoundMethod_t* bound = AS_BOUND_METHOD(callee);
+        /* set slot 0 as "this" for method invocation */
+        vm->sp[-argc - 1] = bound->receiver;
+        return call(vm, bound->method, argc);
+    }
+    break;
 
     default: break;
     }
@@ -810,3 +833,31 @@ static void close_upval(VM_t* vm, Value_t* base)
 }
 
 
+
+static void define_method(VM_t* vm, ObjString_t* class_name)
+{
+    Value_t method = peek(vm, 0);
+    CLOX_ASSERT(IS_CLASS(peek(vm, 1)) && "Coupling: Compiler at fault for not having class on stack.");
+
+    ObjClass_t* klass = AS_CLASS(peek(vm, 1));
+    Table_Set(&klass->methods, class_name, method);
+    VM_Pop(vm); /* the method itself */
+}
+
+
+
+static bool bind_method(VM_t* vm, ObjClass_t* klass, ObjString_t* name)
+{
+    Value_t method;
+    if (Table_Get(&klass->methods, name, &method))
+    {
+        runtime_error(vm, "Undefined property '%s'.", name->cstr);
+        return false;
+    }
+
+    ObjBoundMethod_t* bound_method = ObjBmd_Create(vm, peek(vm ,0), AS_CLOSURE(method));
+
+    VM_Pop(vm);
+    VM_Push(vm, OBJ_VAL(bound_method));
+    return true;
+}

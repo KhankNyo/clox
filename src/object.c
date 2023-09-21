@@ -40,6 +40,12 @@ void Obj_Free(VM_t* vm, Obj_t* obj)
     DEBUG_GC_PRINT("%p free object type %d\n", (void*)obj, obj->type);
     switch (obj->type)
     {
+    case OBJ_BOUND_METHOD:
+    {
+        FREE(vm, ObjBoundMethod_t, obj);
+    }
+    break;
+
     case OBJ_INSTANCE:
     {
         ObjInstance_t* inst = (ObjInstance_t*)obj;
@@ -50,7 +56,9 @@ void Obj_Free(VM_t* vm, Obj_t* obj)
 
     case OBJ_CLASS:
     {
-        FREE(vm, ObjClass_t, obj);
+        ObjClass_t* klass = (ObjClass_t*)obj;
+        Table_Free(&klass->methods);
+        FREE(vm, ObjClass_t, klass);
     }
     break;
 
@@ -162,6 +170,7 @@ ObjClass_t* ObjCla_Create(VM_t* vm, ObjString_t* name)
     ObjClass_t* klass = ALLOCATE_OBJ(vm, ObjClass_t, OBJ_CLASS);
 
     klass->name = name;
+    Table_Init(&klass->methods, vm);
     return klass;
 }
 
@@ -173,6 +182,16 @@ ObjInstance_t* ObjIns_Create(VM_t* vm, ObjClass_t* klass)
     inst->klass = klass;
     Table_Init(&inst->fields, vm);
     return inst;
+}
+
+
+ObjBoundMethod_t* ObjBmd_Create(VM_t* vm, Value_t receiver, ObjClosure_t* closure)
+{
+    ObjBoundMethod_t* bmd = ALLOCATE_OBJ(vm, ObjBoundMethod_t, OBJ_BOUND_METHOD);
+
+    bmd->receiver = receiver;
+    bmd->method = closure;
+    return bmd;
 }
 
 
@@ -282,6 +301,10 @@ void Obj_Print(FILE* fout, const Value_t val)
 {
     switch (OBJ_TYPE(val))
     {
+    case OBJ_BOUND_METHOD:
+        print_function(fout, AS_BOUND_METHOD(val)->method->fun);
+        break;
+        
     case OBJ_INSTANCE:
         fprintf(fout, "%s instance", AS_INSTANCE(val)->klass->name->cstr);
         break;
@@ -309,7 +332,6 @@ void Obj_Print(FILE* fout, const Value_t val)
     case OBJ_UPVAL:
         fprintf(fout, "upvalue");
         break;
-    default: CLOX_ASSERT(false && "Unhandled Obj_Print() case"); break;
     }
 }
 

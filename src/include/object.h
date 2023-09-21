@@ -2,12 +2,15 @@
 #define _CLOX_OBJECT_H_
 
 
+#include "typedefs.h"
 #include "common.h"
 #include "value.h"
-#include "typedefs.h"
 #include "chunk.h"
 #include "table.h"
 
+
+
+typedef Value_t (*NativeFn_t)(int argc, Value_t* argv);
 
 #define OBJ_TYPE(value)     (AS_OBJ(value)->type)
 
@@ -17,6 +20,7 @@
 #define IS_NATIVE(value)    is_objtype(value, OBJ_NATUVE)
 #define IS_CLASS(value)     is_objtype(value, OBJ_CLASS)
 #define IS_INSTANCE(value)  is_objtype(value, OBJ_INSTANCE)
+#define IS_BOUND_METHOD(val)is_objtype(val, OBJ_BOUND_METHOD)
 
 #define AS_STR(value)       ((ObjString_t*)AS_OBJ(value))
 #define AS_CSTR(value)      (AS_STR(value)->cstr)
@@ -25,6 +29,7 @@
 #define AS_NATIVE(value)    ((ObjNativeFn_t*)AS_OBJ(value))
 #define AS_CLASS(value)     ((ObjClass_t*)AS_OBJ(value))
 #define AS_INSTANCE(value)  ((ObjInstance_t*)AS_OBJ(value))
+#define AS_BOUND_METHOD(val)((ObjBoundMethod_t*)AS_OBJ(val))
 
 
 typedef enum ObjType_t
@@ -36,6 +41,7 @@ typedef enum ObjType_t
     OBJ_NATIVE,
     OBJ_CLASS,
     OBJ_INSTANCE,
+    OBJ_BOUND_METHOD,
 } ObjType_t;
 
 struct Obj_t
@@ -49,46 +55,54 @@ struct Obj_t
 
 
 
+struct ObjBoundMethod_t
+{
+    Obj_t obj;
 
-typedef struct ObjClass_t
+    Value_t receiver;
+    ObjClosure_t* method;
+};
+
+
+struct ObjClass_t
 {
     Obj_t obj;
 
     ObjString_t* name;
-} ObjClass_t;
+    Table_t methods;
+};
 
 
-typedef struct ObjInstance_t
+struct ObjInstance_t
 {
     Obj_t obj;
 
     ObjClass_t* klass;
     Table_t fields;
-} ObjInstance_t;
+};
 
 
 
-typedef Value_t (*NativeFn_t)(int argc, Value_t* argv);
-typedef struct ObjNativeFn_t
+struct ObjNativeFn_t
 {
     Obj_t obj;
 
     int arity;
     NativeFn_t fn; /* this ain't fun */
-} ObjNativeFn_t;
+};
 
 
 
-typedef struct ObjUpval_t
+struct ObjUpval_t
 {
     Obj_t obj;
 
     Value_t* location;
     Value_t closed;
     struct ObjUpval_t* next;
-} ObjUpval_t;
+};
 
-typedef struct ObjFunction_t
+struct ObjFunction_t
 {
     Obj_t obj;
 
@@ -96,16 +110,16 @@ typedef struct ObjFunction_t
     int upval_count;
     Chunk_t chunk;
     ObjString_t* name;
-} ObjFunction_t;
+};
 
-typedef struct ObjClosure_t
+struct ObjClosure_t
 {
     Obj_t obj;
 
     ObjFunction_t* fun;
     ObjUpval_t** upvals;
     int upval_count; // fuck gc
-} ObjClosure_t;
+};
 
 
 
@@ -160,11 +174,15 @@ ObjClosure_t* ObjClo_Create(VM_t* vm, ObjFunction_t* fun);
  */
 ObjClass_t* ObjCla_Create(VM_t* vm, ObjString_t* name);
 
-
 /*
  *  Creates a new instance of a class
  */
 ObjInstance_t* ObjIns_Create(VM_t* vm, ObjClass_t* klass);
+
+/* 
+ *  Creates a new bound method 
+ */
+ObjBoundMethod_t* ObjBmd_Create(VM_t* vm, Value_t receiver, ObjClosure_t* method);
 
 
 
