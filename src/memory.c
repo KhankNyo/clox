@@ -187,7 +187,6 @@ void Allocator_Free(Allocator_t* allocator, void* ptr)
         );
 		abort();
 	}
-    fprintf(stderr, "freed content: %*.x\n", GET_HEADER(ptr)->capacity, ptr);
     memset(ptr, 0, GET_HEADER(ptr)->capacity);
 #endif /* DEBUG_ALLOCATION_CHK */
 
@@ -295,14 +294,6 @@ void GC_MarkObj(VM_t* vm, Obj_t* obj)
 #endif /* DEBUG_LOG_GC */
 
     obj->is_marked = true;
-    switch (obj->type)
-    {
-    case OBJ_NATIVE:
-    case OBJ_STRING:
-        return;
-    default: break;
-    }
-
 
     if (vm->gray_count + 1 > vm->gray_capacity)
     {
@@ -311,8 +302,7 @@ void GC_MarkObj(VM_t* vm, Obj_t* obj)
             vm->gray_stack, vm->gray_capacity * sizeof(Obj_t*)
         );
     }
-    vm->gray_stack[vm->gray_count] = obj;
-    vm->gray_count += 1;
+    vm->gray_stack[vm->gray_count++] = obj;
 }
 
 
