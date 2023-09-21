@@ -1,0 +1,19 @@
+
+new features should go through these stages:
+    scanner: scan for keyword if the new feature brought a new keyword
+    parser/compiler: compiles the feature into code
+        instruction: if the new feature requires new instructions, refer to the INSTRUCTION section
+        object/value: if the new feature added an object or value type, refer to the OBJ/VAL section
+
+
+INSTRUCTION:
+    add the new instruction in chunk.h
+    implement what the instruction does in vm.c 
+    implement how the instruction should be disassembled in debug.c 
+
+OBJ/VAL:
+    add the new object struct, type, and macros in object.h
+    add an ObjXXX_Create function to create the new object, where XXX is a unique 3-letter name
+    add a case in Obj_Free to free the pointer to the object, and its members if the object owns them
+    add a case in Obj_Print to print the object
+    add a case in gc_blacken_obj in memory.c for the garbage collector, it should mark its members who are values or objects themselves
