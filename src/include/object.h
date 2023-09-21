@@ -6,7 +6,7 @@
 #include "value.h"
 #include "typedefs.h"
 #include "chunk.h"
-
+#include "table.h"
 
 
 #define OBJ_TYPE(value)     (AS_OBJ(value)->type)
@@ -15,12 +15,16 @@
 #define IS_FUNCTION(value)  is_objtype(value, OBJ_FUNCTION)
 #define IS_CLOSURE(value)   is_objtype(value, OBJ_CLOSURE)
 #define IS_NATIVE(value)    is_objtype(value, OBJ_NATUVE)
+#define IS_CLASS(value)     is_objtype(value, OBJ_CLASS)
+#define IS_INSTANCE(value)  is_objtype(value, OBJ_INSTANCE)
 
 #define AS_STR(value)       ((ObjString_t*)AS_OBJ(value))
 #define AS_CSTR(value)      (AS_STR(value)->cstr)
 #define AS_FUNCTION(value)  ((ObjFunction_t*)AS_OBJ(value))
-#define AS_CLOSURE(value)   ((ObjClosure_t*)(AS_OBJ(value)))
-#define AS_NATIVE(value)    (((ObjNativeFn_t*)AS_OBJ(value)))
+#define AS_CLOSURE(value)   ((ObjClosure_t*)AS_OBJ(value))
+#define AS_NATIVE(value)    ((ObjNativeFn_t*)AS_OBJ(value))
+#define AS_CLASS(value)     ((ObjClass_t*)AS_OBJ(value))
+#define AS_INSTANCE(value)  ((ObjInstance_t*)AS_OBJ(value))
 
 
 typedef enum ObjType_t
@@ -30,6 +34,8 @@ typedef enum ObjType_t
     OBJ_FUNCTION,
     OBJ_CLOSURE,
     OBJ_NATIVE,
+    OBJ_CLASS,
+    OBJ_INSTANCE,
 } ObjType_t;
 
 struct Obj_t
@@ -40,6 +46,25 @@ struct Obj_t
 };
 
 
+
+
+
+
+typedef struct ObjClass_t
+{
+    Obj_t obj;
+
+    ObjString_t* name;
+} ObjClass_t;
+
+
+typedef struct ObjInstance_t
+{
+    Obj_t obj;
+
+    ObjClass_t* klass;
+    Table_t fields;
+} ObjInstance_t;
 
 
 
@@ -128,7 +153,19 @@ ObjFunction_t* ObjFun_Create(VM_t* vm);
 /*
  *  wraps a function around a closure object, cleanup using Obj_Free()
  */
-ObjClosure_t* ObjCls_Create(VM_t* vm, ObjFunction_t* fun);
+ObjClosure_t* ObjClo_Create(VM_t* vm, ObjFunction_t* fun);
+
+/*
+ *  Creates a new class object
+ */
+ObjClass_t* ObjCla_Create(VM_t* vm, ObjString_t* name);
+
+
+/*
+ *  Creates a new instance of a class
+ */
+ObjInstance_t* ObjIns_Create(VM_t* vm, ObjClass_t* klass);
+
 
 
 

@@ -190,6 +190,20 @@ size_t Disasm_Instruction(FILE* fout, const Chunk_t* chunk, size_t offset)
     case OP_GET_UPVALUE:
         offset = byte_instruction(fout, "OP_GET_UPVALUE", chunk, offset);
         break;
+
+    case OP_SET_PROPERTY:
+        offset = const_instruction(fout, "OP_SET_PROPERTY", chunk, offset, 1);
+        break;
+    case OP_GET_PROPERTY:
+        offset = const_instruction(fout, "OP_GET_PROPERTY", chunk, offset, 1);
+        break;
+    case OP_SET_PROPERTY_LONG:
+        offset = const_instruction(fout, "OP_SET_PROPERTY_LONG", chunk, offset, 3);
+        break;
+    case OP_GET_PROPERTY_LONG:
+        offset = const_instruction(fout, "OP_GET_PROPERTY_LONG", chunk, offset, 3);
+        break;
+        
     case OP_CLOSURE:
     {
         offset++; /* skip instruction */
@@ -213,6 +227,15 @@ size_t Disasm_Instruction(FILE* fout, const Chunk_t* chunk, size_t offset)
     case OP_CLOSE_UPVALUE:
         offset = single_byte(fout, "OP_CLOSE_UPVALUE", offset);
         break;
+
+    case OP_CLASS:
+        offset = const_instruction(fout, "OP_CLASS", chunk, offset, 1);
+        break;
+
+    case OP_DUP:
+        offset = single_byte(fout, "OP_DUP", offset);
+        break;
+
 
 
 

@@ -142,7 +142,7 @@ InterpretResult_t VM_Interpret(VM_t* vm, const char* src)
         return INTERPRET_COMPILE_ERROR;
 
     VM_Push(vm, OBJ_VAL(fun));
-    ObjClosure_t* script = ObjCls_Create(vm, fun);
+    ObjClosure_t* script = ObjClo_Create(vm, fun);
     VM_Pop(vm);
     VM_Push(vm, OBJ_VAL(script));
 
@@ -170,6 +170,8 @@ static InterpretResult_t run(VM_t* vm)
 {
     CLOX_ASSERT(vm->frame_count > 0);
     CallFrame_t* current = peek_cf(vm, 0);
+
+    /* these macros make me sick */
 
 #define PUSH(val)\
 do{\
@@ -220,6 +222,38 @@ do{\
             return INTERPRET_RUNTIME_ERROR;\
         }\
     } while (0)
+
+#define GET_PROPERTY(readstr_macro) \
+    do {\
+        if (!IS_INSTANCE(peek(vm, 0))) {\
+            runtime_error(vm, "Only instances have properties."); \
+            return INTERPRET_RUNTIME_ERROR; \
+        } \
+        ObjInstance_t* inst = AS_INSTANCE(peek(vm, 0));\
+        ObjString_t* name = readstr_macro();\
+        Value_t field_val = NIL_VAL();\
+        if (Table_Get(&inst->fields, name, &field_val)) {\
+            POP(); /* the instance */\
+            PUSH(field_val);\
+            break;\
+        }\
+        runtime_error(vm, "Undefined property '%s'.", name->cstr);\
+        return INTERPRET_RUNTIME_ERROR;\
+    } while (0)
+
+#define SET_PROPERTY(readstr_macro)\
+    do {\
+        if (!IS_INSTANCE(peek(vm, 1))) {\
+            runtime_error(vm, "Only instances have fields.");\
+            return INTERPRET_RUNTIME_ERROR;\
+        }\
+        ObjInstance_t* inst = AS_INSTANCE(peek(vm, 1));\
+        ObjString_t* name = readstr_macro();\
+        Value_t val = POP();\
+        Table_Set(&inst->fields, name, val);\
+        POP(); /* the instance */\
+        PUSH(val);\
+    } while(0)
 
 
 #define BINARY_OP(ValueType, op) \
@@ -340,10 +374,10 @@ do{\
         }
         break;
 
-        case OP_GET_GLOBAL_LONG:    GET_GLOBAL(READ_STR_LONG); break;
         case OP_GET_GLOBAL:         GET_GLOBAL(READ_STR); break;
-        case OP_SET_GLOBAL_LONG:    SET_GLOBAL(READ_STR_LONG); break;
+        case OP_GET_GLOBAL_LONG:    GET_GLOBAL(READ_STR_LONG); break;
         case OP_SET_GLOBAL:         SET_GLOBAL(READ_STR); break;
+        case OP_SET_GLOBAL_LONG:    SET_GLOBAL(READ_STR_LONG); break;
 
         case OP_JUMP:
         {
@@ -400,10 +434,16 @@ do{\
             *upval->location = peek(vm, 0);
         }
         break;
+
+        case OP_GET_PROPERTY:       GET_PROPERTY(READ_STR); break;
+        case OP_GET_PROPERTY_LONG:  GET_PROPERTY(READ_STR_LONG); break;
+        case OP_SET_PROPERTY:       SET_PROPERTY(READ_STR); break;
+        case OP_SET_PROPERTY_LONG:  SET_PROPERTY(READ_STR_LONG); break;
+
         case OP_CLOSURE:
         {
             ObjFunction_t* fun = AS_FUNCTION(READ_CONSTANT());
-            ObjClosure_t* closure = ObjCls_Create(vm, fun);
+            ObjClosure_t* closure = ObjClo_Create(vm, fun);
             PUSH(OBJ_VAL(closure));
 
             for (int i = 0; i < fun->upval_count; i++)
@@ -422,10 +462,12 @@ do{\
             }
         }
         break;
+
         case OP_CLOSE_UPVALUE:
             close_upval(vm, vm->sp - 1);
             POP();
             break;
+
         case OP_RETURN:
         {
             Value_t val = POP();
@@ -440,6 +482,21 @@ do{\
             vm->sp = current->base;
             PUSH(val);
             current = peek_cf(vm, 0);
+        }
+        break;
+        
+        case OP_CLASS:
+        {
+            ObjClass_t* klass = ObjCla_Create(vm, READ_STR());
+            PUSH(OBJ_VAL(klass));
+        }
+        break;
+
+        case OP_DUP:
+        {
+            Value_t val = POP();
+            PUSH(val);
+            PUSH(val);
         }
         break;
 
@@ -650,6 +707,14 @@ static bool call_value(VM_t* vm, Value_t callee, int argc)
     {
     case OBJ_NATIVE: return call_native(vm, AS_NATIVE(callee), argc);
     case OBJ_CLOSURE: return call(vm, AS_CLOSURE(callee), argc);
+    case OBJ_CLASS: /* ctor call */
+    {
+        ObjClass_t* klass = AS_CLASS(callee);
+        vm->sp[-argc - 1] = OBJ_VAL(ObjIns_Create(vm, klass));
+        return true;
+    }
+    break;
+
     default: break;
     }
 

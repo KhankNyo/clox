@@ -5,7 +5,7 @@
 
 #include "common.h"
 #include "memory.h"
-#include "object.h"
+#include "typedefs.h"
 
 typedef struct Entry_t
 {

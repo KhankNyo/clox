@@ -40,6 +40,20 @@ void Obj_Free(VM_t* vm, Obj_t* obj)
     DEBUG_GC_PRINT("%p free object type %d\n", (void*)obj, obj->type);
     switch (obj->type)
     {
+    case OBJ_INSTANCE:
+    {
+        ObjInstance_t* inst = (ObjInstance_t*)obj;
+        Table_Free(&inst->fields);
+        FREE(vm, ObjInstance_t, inst);
+    }
+    break;
+
+    case OBJ_CLASS:
+    {
+        FREE(vm, ObjClass_t, obj);
+    }
+    break;
+
     case OBJ_NATIVE:
         FREE(vm, ObjNativeFn_t, obj);
         break;
@@ -123,21 +137,46 @@ ObjFunction_t* ObjFun_Create(VM_t* vm)
 }
 
 
-ObjClosure_t* ObjCls_Create(VM_t* vm, ObjFunction_t* fun)
+
+ObjClosure_t* ObjClo_Create(VM_t* vm, ObjFunction_t* fun)
 {
     ObjUpval_t** upvals = ALLOCATE(vm, ObjUpval_t*, fun->upval_count);
+    VM_Push(vm, OBJ_VAL(upvals));
     for (int i = 0; i < fun->upval_count; i++)
     {
         upvals[i] = NULL; // again fuck the gc
     }
 
     ObjClosure_t* closure = ALLOCATE_OBJ(vm, ObjClosure_t, OBJ_CLOSURE);
+    VM_Pop(vm);
 
     closure->upvals = upvals;
     closure->upval_count = fun->upval_count;
     closure->fun = fun;
     return closure;
 }
+
+
+ObjClass_t* ObjCla_Create(VM_t* vm, ObjString_t* name)
+{
+    ObjClass_t* klass = ALLOCATE_OBJ(vm, ObjClass_t, OBJ_CLASS);
+
+    klass->name = name;
+    return klass;
+}
+
+
+ObjInstance_t* ObjIns_Create(VM_t* vm, ObjClass_t* klass)
+{
+    ObjInstance_t* inst = ALLOCATE_OBJ(vm, ObjInstance_t, OBJ_INSTANCE);
+
+    inst->klass = klass;
+    Table_Init(&inst->fields, vm);
+    return inst;
+}
+
+
+
 
 
 
@@ -243,6 +282,14 @@ void Obj_Print(FILE* fout, const Value_t val)
 {
     switch (OBJ_TYPE(val))
     {
+    case OBJ_INSTANCE:
+        fprintf(fout, "%s instance", AS_INSTANCE(val)->klass->name->cstr);
+        break;
+
+    case OBJ_CLASS:
+        fprintf(fout, "%s", AS_CLASS(val)->name->cstr);
+        break;
+
     case OBJ_NATIVE:
         fprintf(fout, "<native fn>");
         break;

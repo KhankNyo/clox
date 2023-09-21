@@ -228,9 +228,9 @@ void Allocator_Defrag(Allocator_t* allocator, size_t num_pointers)
 
 void* GC_Reallocate(VM_t* vm, void* ptr, bufsize_t oldsize, bufsize_t newsize)
 {
-    vm->bytes_allocated += newsize - oldsize;
     if (oldsize < newsize)
     {
+        vm->bytes_allocated += newsize - oldsize;
 #ifdef DEBUG_STRESS_GC
         GC_CollectGarbage(vm);
 #endif /* DEBUG_STRESS_GC */
@@ -607,9 +607,25 @@ static void gc_blacken_obj(VM_t* vm, Obj_t* obj)
     case OBJ_STRING:
         break;
 
+    case OBJ_INSTANCE:
+    {
+        ObjInstance_t* inst = (ObjInstance_t*)obj;
+        GC_MarkObj(vm, (Obj_t*)inst->klass);
+        Table_Mark(&inst->fields);
+    }
+    break;
+
+    case OBJ_CLASS:
+    {
+        ObjClass_t* klass = (ObjClass_t*)obj;
+        GC_MarkObj(vm, (Obj_t*)klass->name);
+    }
+    break;
+
     case OBJ_UPVAL:
         GC_MarkVal(vm, ((ObjUpval_t*)obj)->closed);
         break;
+
     case OBJ_FUNCTION:
     {
         ObjFunction_t* fun = (ObjFunction_t*)obj;
@@ -617,6 +633,7 @@ static void gc_blacken_obj(VM_t* vm, Obj_t* obj)
         gc_mark_valarr(vm, &fun->chunk.consts);
     }
     break;
+
     case OBJ_CLOSURE:
     {
         ObjClosure_t* closure = (ObjClosure_t*)obj;

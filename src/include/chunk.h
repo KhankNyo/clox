@@ -27,6 +27,8 @@ typedef enum Opc_t
     OP_SET_GLOBAL,
     OP_GET_UPVALUE,
     OP_SET_UPVALUE,
+    OP_GET_PROPERTY,
+    OP_SET_PROPERTY,
 	OP_EQUAL,
 	OP_GREATER,
 	OP_LESS,
@@ -44,14 +46,18 @@ typedef enum Opc_t
     OP_CLOSURE,
     OP_CLOSE_UPVALUE,
 	OP_RETURN,
+    OP_CLASS,
 
 
 	/* challenges/extensions */
+    OP_DUP,
     OP_POPN                 = OP_POP | 0x80,
 	OP_CONSTANT_LONG        = OP_CONSTANT | 0x80,
     OP_DEFINE_GLOBAL_LONG   = OP_DEFINE_GLOBAL | 0x80,
     OP_GET_GLOBAL_LONG      = OP_GET_GLOBAL | 0x80,
     OP_SET_GLOBAL_LONG      = OP_SET_GLOBAL | 0x80,
+    OP_SET_PROPERTY_LONG    = OP_SET_PROPERTY | 0x80,
+    OP_GET_PROPERTY_LONG    = OP_GET_PROPERTY | 0x80,
 } Opc_t;
 
 
