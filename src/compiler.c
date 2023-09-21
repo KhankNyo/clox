@@ -46,6 +46,7 @@ typedef enum Precedence_t {
 typedef enum FuntionType_t
 {
     TYPE_FUNCTION = 0,
+    TYPE_METHOD,
     TYPE_SCRIPT,
 } FunctionType_t;
 
@@ -65,7 +66,7 @@ typedef struct Upval_t
 
 typedef struct CompilerData_t
 {
-    struct CompilerData_t* next;
+    struct CompilerData_t* prev;
     ObjFunction_t* fun;
     FunctionType_t funtype;
 
@@ -75,6 +76,11 @@ typedef struct CompilerData_t
     Local_t locals[UINT8_COUNT];
 } CompilerData_t;
 
+typedef struct ClassData_t
+{
+    struct ClassData_t* prev;
+} ClassData_t;
+
 struct Compiler_t
 {
     VM_t* vm;
@@ -82,6 +88,7 @@ struct Compiler_t
     Parser_t parser;
 
     CompilerData_t* data;
+    ClassData_t* current_class;
 };
 
 
@@ -147,8 +154,10 @@ static int add_upval(CompilerData_t* data, Parser_t* parser, const uint8_t index
 
 static void declaration(Compiler_t* compiler);
 static void decl_class(Compiler_t* compiler);
+    static void class_method(Compiler_t* compiler);
 static void decl_var(Compiler_t* compiler);
 static void decl_fun(Compiler_t* compiler);
+/* compiles function body */
 static void function(Compiler_t* compiler, FunctionType_t type);
 
 
@@ -185,6 +194,7 @@ static void assignment(Compiler_t* compiler, Opc_t set_op, Opc_t get_op, unsigne
 static void call(Compiler_t* compiler, bool can_assign);
 static uint8_t arglist(Compiler_t* compiler);
 static void dot(Compiler_t* compiler, bool can_assign);
+static void this_(Compiler_t* compiler, bool can_assign);
 
 
 
@@ -290,7 +300,7 @@ static const ParseRule_t s_rules[] =
   [TOKEN_PRINT]         = {NULL,     NULL,   PREC_NONE},
   [TOKEN_RETURN]        = {NULL,     NULL,   PREC_NONE},
   [TOKEN_SUPER]         = {NULL,     NULL,   PREC_NONE},
-  [TOKEN_THIS]          = {NULL,     NULL,   PREC_NONE},
+  [TOKEN_THIS]          = {this_,    NULL,   PREC_NONE},
   [TOKEN_TRUE]          = {literal,  NULL,   PREC_NONE},
   [TOKEN_VAR]           = {NULL,     NULL,   PREC_NONE},
   [TOKEN_WHILE]         = {NULL,     NULL,   PREC_NONE},
@@ -351,7 +361,7 @@ void Compiler_MarkObj(Compiler_t* compiler)
     while (NULL != compdat)
     {
         GC_MarkObj(compiler->vm, (Obj_t*)compdat->fun);
-        compdat = compdat->next;
+        compdat = compdat->prev;
     }
 }
 
@@ -378,6 +388,7 @@ static void compiler_init(Compiler_t* compiler, VM_t* vm, const char* src, Compi
     compiler->parser.panic_mode = false;
     compiler->vm = vm;
     compiler->data = NULL;
+    compiler->current_class = NULL;
 
     vm->compiler = compiler;
     advance(compiler);
@@ -400,7 +411,7 @@ static ObjFunction_t* compiler_end(Compiler_t* compiler)
 
 static void compdat_init(Compiler_t* compiler, CompilerData_t* compdat, FunctionType_t type)
 {
-    compdat->next = compiler->data;
+    compdat->prev = compiler->data;
     compiler->data = compdat;
 
 
@@ -419,11 +430,20 @@ static void compdat_init(Compiler_t* compiler, CompilerData_t* compdat, Function
     compdat->scope_depth = 0;
     compdat->local_count = 1;
     compdat->locals[0] = (Local_t){
-        .name.start = "",
-        .name.len = 0,
         .depth = 0,
         .is_captured = false,
     };
+
+    if (type != TYPE_FUNCTION)
+    {
+        compdat->locals[0].name.start = "this";
+        compdat->locals[0].name.len = 4;
+    }
+    else 
+    {
+        compdat->locals[0].name.start = "";
+        compdat->locals[0].name.len = 0;
+    }
 }
 
 
@@ -442,7 +462,7 @@ static ObjFunction_t* compdat_end(Compiler_t* compiler, CompilerData_t* compdat)
     }
 #endif /* DEBUG_PRINT_CODE */
 
-    compiler->data = compdat->next;
+    compiler->data = compdat->prev;
     return fun;
 }
 
@@ -576,17 +596,17 @@ static int resolve_local(CompilerData_t* data, Parser_t* parser, const Token_t n
 
 static int resolve_upval(CompilerData_t* data, Parser_t* parser, const Token_t name)
 {
-    if (NULL == data->next)
+    if (NULL == data->prev)
         return VAR_UNDEFINED;
 
-    int index = resolve_local(data->next, parser, name);
+    int index = resolve_local(data->prev, parser, name);
     if (VAR_UNDEFINED != index)
     {
-        data->next->locals[index].is_captured = true;
+        data->prev->locals[index].is_captured = true;
         return add_upval(data, parser, index, true);
     }
 
-    int upval = resolve_upval(data->next, parser, name);
+    int upval = resolve_upval(data->prev, parser, name);
     if (VAR_UNDEFINED != upval)
     {
         return add_upval(data, parser, upval, false);
@@ -721,14 +741,47 @@ static void declaration(Compiler_t* compiler)
 static void decl_class(Compiler_t* compiler)
 {
     consume(compiler, TOKEN_IDENTIFIER, "Expected class name.");
-    size_t named_constant = identifier_constant(compiler, compiler->parser.prev);
+    Token_t class_name = compiler->parser.prev;
+    size_t named_constant = identifier_constant(compiler, class_name);
     declare_local(compiler); /* scope of class decl is preserved */
+
 
     emit_2_bytes(compiler, OP_CLASS, named_constant);
     define_variable(compiler, named_constant);
 
+    /* pushes class data */
+    ClassData_t class_data;
+    class_data.prev = compiler->current_class;
+    compiler->current_class = &class_data;
+
+    named_variable(compiler, class_name, false);
+
+
     consume(compiler, TOKEN_LEFT_BRACE, "Expected '{' before class body.");
+    while (!current_token_type(compiler, TOKEN_RIGHT_BRACE) &&
+        !current_token_type(compiler, TOKEN_EOF))
+    {
+        class_method(compiler);
+    }
     consume(compiler, TOKEN_RIGHT_BRACE, "Expected '}' after class body.");
+
+
+    emit_pop(compiler, 1); /* pops the class name */
+
+    /* pops class data */
+    compiler->current_class = class_data.prev;
+}
+
+
+static void class_method(Compiler_t* compiler)
+{
+    /* assumes class name is on stack */
+    consume(compiler, TOKEN_IDENTIFIER, "Expected method name.");
+    size_t constant = identifier_constant(compiler, compiler->parser.prev);
+    emit_2_bytes(compiler, OP_METHOD, constant);
+
+    FunctionType_t funtype = TYPE_METHOD;
+    function(compiler, funtype);
 }
 
 
@@ -1331,6 +1384,19 @@ static void dot(Compiler_t* compiler, bool can_assign)
             name >> 0 
         );
     }
+}
+
+
+
+static void this_(Compiler_t* compiler, bool can_assign)
+{
+    (void)can_assign;
+    if (NULL == compiler->current_class)
+    {
+        error(&compiler->parser, "Can't use 'this' outside of a class.");
+        return;
+    }
+    variable(compiler, false);
 }
 
 

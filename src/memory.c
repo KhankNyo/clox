@@ -607,6 +607,14 @@ static void gc_blacken_obj(VM_t* vm, Obj_t* obj)
     case OBJ_STRING:
         break;
 
+    case OBJ_BOUND_METHOD:
+    {
+        ObjBoundMethod_t* bmd = (ObjBoundMethod_t*)obj;
+        GC_MarkObj(vm, (Obj_t*)bmd->method);
+        GC_MarkVal(vm, bmd->receiver);
+    }
+    break;
+
     case OBJ_INSTANCE:
     {
         ObjInstance_t* inst = (ObjInstance_t*)obj;
@@ -619,6 +627,7 @@ static void gc_blacken_obj(VM_t* vm, Obj_t* obj)
     {
         ObjClass_t* klass = (ObjClass_t*)obj;
         GC_MarkObj(vm, (Obj_t*)klass->name);
+        Table_Mark(&klass->methods);
     }
     break;
 

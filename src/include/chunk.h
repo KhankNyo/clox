@@ -47,6 +47,7 @@ typedef enum Opc_t
     OP_CLOSE_UPVALUE,
 	OP_RETURN,
     OP_CLASS,
+    OP_METHOD,
 
 
 	/* challenges/extensions */

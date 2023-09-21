@@ -236,6 +236,10 @@ size_t Disasm_Instruction(FILE* fout, const Chunk_t* chunk, size_t offset)
         offset = single_byte(fout, "OP_DUP", offset);
         break;
 
+    case OP_METHOD:
+        offset = const_instruction(fout, "OP_METHOD", chunk, offset, 1);
+        break;
+
 
 
 
