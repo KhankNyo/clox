@@ -56,6 +56,7 @@ static bool bind_method(VM_t* vm, ObjClass_t* klass, ObjString_t* name);
 void VM_Init(VM_t* vm, Allocator_t* alloc)
 {
     init_state(vm, alloc);
+    vm->init_str = ObjStr_Copy(vm, "init", 4);
     CLOX_ASSERT(VM_DefineNative(vm, "clock", Native_Clock, 0));
 }
 
@@ -70,10 +71,13 @@ void VM_Reset(VM_t* vm)
 
 void VM_Free(VM_t* vm)
 {
+    vm->init_str = NULL; /* fuck gc */
+
     Allocator_Free(vm->alloc, vm->gray_stack);
     VM_FreeObjects(vm);
     Table_Free(&vm->strings);
     Table_Free(&vm->globals);
+
     init_state(vm, vm->alloc);
 }
 
@@ -548,6 +552,7 @@ static void init_state(VM_t* vm, Allocator_t* alloc)
     vm->alloc = alloc;
     vm->compiler = NULL;
     vm->frame_count = 0;
+    vm->init_str = NULL;
 
     vm->gray_count = 0;
     vm->gray_capacity = 0;
@@ -726,6 +731,16 @@ static bool call_value(VM_t* vm, Value_t callee, int argc)
     {
         ObjClass_t* klass = AS_CLASS(callee);
         vm->sp[-argc - 1] = OBJ_VAL(ObjIns_Create(vm, klass));
+        Value_t initializer;
+        if (Table_Get(&klass->methods, vm->init_str, &initializer)) 
+        {
+            return call(vm, AS_CLOSURE(initializer), argc);
+        }
+        else if (argc != 0)
+        {
+            runtime_error(vm, "Expected 0 arguments but got %d.", argc);
+            return false;
+        }
         return true;
     }
     break;
@@ -849,7 +864,7 @@ static void define_method(VM_t* vm, ObjString_t* class_name)
 static bool bind_method(VM_t* vm, ObjClass_t* klass, ObjString_t* name)
 {
     Value_t method;
-    if (Table_Get(&klass->methods, name, &method))
+    if (!Table_Get(&klass->methods, name, &method))
     {
         runtime_error(vm, "Undefined property '%s'.", name->cstr);
         return false;

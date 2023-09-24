@@ -47,6 +47,7 @@ typedef enum FuntionType_t
 {
     TYPE_FUNCTION = 0,
     TYPE_METHOD,
+    TYPE_INITIALIZER,
     TYPE_SCRIPT,
 } FunctionType_t;
 
@@ -778,10 +779,16 @@ static void class_method(Compiler_t* compiler)
     /* assumes class name is on stack */
     consume(compiler, TOKEN_IDENTIFIER, "Expected method name.");
     size_t constant = identifier_constant(compiler, compiler->parser.prev);
-    emit_2_bytes(compiler, OP_METHOD, constant);
 
     FunctionType_t funtype = TYPE_METHOD;
+    Token_t method_name = compiler->parser.prev;
+    if (method_name.len == 4 && memcmp(method_name.start, "init", 4) == 0)
+    {
+        funtype = TYPE_INITIALIZER;
+    }
     function(compiler, funtype);
+
+    emit_2_bytes(compiler, OP_METHOD, constant);
 }
 
 
@@ -1104,6 +1111,11 @@ static void stmt_return(Compiler_t* compiler)
     }
     else 
     {
+        if (compiler->data->funtype == TYPE_INITIALIZER)
+        {
+            error(&compiler->parser, "Cannot return a value from an initializer.");
+        }
+
         expression(compiler);
         consume(compiler, TOKEN_SEMICOLON, "Expected ';' after expression.");
         emit_byte(compiler, OP_RETURN);
@@ -1235,7 +1247,7 @@ static void named_variable(Compiler_t* compiler, const Token_t name, bool can_as
 {
     uint8_t get_op, set_op;
     int arg = resolve_local(compiler->data, &compiler->parser, name);
-    if (VAR_UNDEFINED != arg) /* then is assumed to be global */
+    if (VAR_UNDEFINED != arg)
     {
         get_op = OP_GET_LOCAL;
         set_op = OP_SET_LOCAL;
@@ -1460,7 +1472,15 @@ static void emit_global(Compiler_t* compiler, Opc_t opcode, size_t addr)
 
 static void emit_return(Compiler_t* compiler)
 {
-    emit_2_bytes(compiler, OP_NIL, OP_RETURN);
+    if (compiler->data->funtype == TYPE_INITIALIZER)
+    {
+        emit_2_bytes(compiler, OP_GET_LOCAL, 0); /* 'this' */
+    }
+    else 
+    {
+        emit_byte(compiler, OP_NIL);
+    }
+    emit_byte(compiler, OP_RETURN);
 }
 
 
