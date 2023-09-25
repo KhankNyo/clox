@@ -1,4 +1,4 @@
-CC=gcc
+CC?=gcc
 CCF?=-Ofast -flto -std=c99 -Wall -Wextra -Wpedantic -DOBJSTR_FLEXIBLE_ARR
 LDF?=-flto
 LIBS=
