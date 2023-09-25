@@ -373,7 +373,7 @@ static ObjString_t* allocate_string(VM_t* vm, char* cstr, int len, uint32_t hash
 
 static Obj_t* allocate_obj(VM_t* vm, size_t nbytes, ObjType_t type)
 {
-    Obj_t* obj = Allocator_Alloc(vm->alloc, nbytes);
+    Obj_t* obj = ALLOCATE(vm, uint8_t, nbytes);
     obj->type = type;
     obj->is_marked = false;
 

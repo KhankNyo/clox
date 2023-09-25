@@ -39,12 +39,14 @@ static bool call(VM_t* vm, ObjClosure_t* closure, int argc);
 static bool call_native(VM_t* vm, ObjNativeFn_t* native, int argc);
 
 
-static ObjUpval_t* capture_upval(VM_t* data, Value_t* base);
+static ObjUpval_t* capture_upval(VM_t* data, Value_t* bp);
 static void close_upval(VM_t* vm, Value_t* sp);
 
 
 static void define_method(VM_t* vm, ObjString_t* class_name);
 static bool bind_method(VM_t* vm, ObjClass_t* klass, ObjString_t* name);
+static bool invoke_method(VM_t* vm, const ObjString_t* method_name, int argc);
+static bool invoke_class_method(VM_t* vm, ObjClass_t* klass, const ObjString_t* method_name, int argc);
 
 
 
@@ -56,6 +58,7 @@ static bool bind_method(VM_t* vm, ObjClass_t* klass, ObjString_t* name);
 void VM_Init(VM_t* vm, Allocator_t* alloc)
 {
     init_state(vm, alloc);
+    vm->init_str = ObjStr_Copy(vm, "init", 4);
     CLOX_ASSERT(VM_DefineNative(vm, "clock", Native_Clock, 0));
 }
 
@@ -70,10 +73,13 @@ void VM_Reset(VM_t* vm)
 
 void VM_Free(VM_t* vm)
 {
+    vm->init_str = NULL; /* fuck gc */
+
     Allocator_Free(vm->alloc, vm->gray_stack);
     VM_FreeObjects(vm);
     Table_Free(&vm->strings);
     Table_Free(&vm->globals);
+
     init_state(vm, vm->alloc);
 }
 
@@ -109,6 +115,16 @@ Value_t VM_Pop(VM_t* vm)
     return *vm->sp;
 }
 
+
+void VM_PrintStack(FILE* fout, const VM_t* vm)
+{
+    for (const Value_t* slot = vm->stack; slot < vm->sp; slot++)
+    {
+        fprintf(fout, "[ ");
+        Value_Print(fout, *slot);
+        fprintf(fout, " ]");
+    }
+}
 
 
 bool VM_DefineNative(VM_t* vm, const char* name, NativeFn_t fn, uint8_t argc)
@@ -368,13 +384,13 @@ do{\
         case OP_SET_LOCAL: 
         {
             uint8_t slot = READ_BYTE();
-            current->base[slot] = peek(vm, 0);
+            current->bp[slot] = peek(vm, 0);
         }
         break;
         case OP_GET_LOCAL: 
         {
             uint8_t slot = READ_BYTE();
-            PUSH(current->base[slot]); 
+            PUSH(current->bp[slot]); 
         }
         break;
 
@@ -419,6 +435,18 @@ do{\
         }
         break;
 
+        case OP_INVOKE:
+        {
+            ObjString_t* method = READ_STR();
+            int argc = READ_BYTE();
+            if (!invoke_method(vm, method, argc))
+            {
+                return INTERPRET_RUNTIME_ERROR;
+            }
+            current = peek_cf(vm, 0);
+        }
+        break;
+
         case OP_GET_UPVALUE:
         {
             uint8_t slot = READ_BYTE();
@@ -457,7 +485,7 @@ do{\
 
                 if (is_local)
                 {
-                    closure->upvals[i] = capture_upval(vm, current->base + slot);
+                    closure->upvals[i] = capture_upval(vm, current->bp + slot);
                 }
                 else 
                 {
@@ -475,7 +503,7 @@ do{\
         case OP_RETURN:
         {
             Value_t val = POP();
-            close_upval(vm, current->base);
+            close_upval(vm, current->bp);
             vm->frame_count--;
             if (vm->frame_count == 0)
             {
@@ -483,7 +511,7 @@ do{\
                 return INTERPRET_OK;
             }
 
-            vm->sp = current->base;
+            vm->sp = current->bp;
             PUSH(val);
             current = peek_cf(vm, 0);
         }
@@ -548,13 +576,14 @@ static void init_state(VM_t* vm, Allocator_t* alloc)
     vm->alloc = alloc;
     vm->compiler = NULL;
     vm->frame_count = 0;
+    vm->init_str = NULL;
 
     vm->gray_count = 0;
     vm->gray_capacity = 0;
     vm->gray_stack = NULL;
 
     vm->bytes_allocated = 0;
-    vm->next_gc = 1;
+    vm->next_gc = 1024 * 1024;
 
 
     stack_reset(vm);
@@ -656,12 +685,7 @@ static void debug_trace_execution(const VM_t* vm)
     const CallFrame_t* current = &vm->frames[vm->frame_count - 1];
 
     fprintf(stderr, "          ");
-    for (const Value_t* slot = vm->stack; slot < vm->sp; slot++) 
-    {
-        fprintf(stderr, "[ ");
-        Value_Print(stderr, *slot);
-        fprintf(stderr, " ]");
-    }
+    VM_PrintStack(stderr, vm);
     fprintf(stderr, "\n");
     Disasm_Instruction(stderr, 
         &current->closure->fun->chunk, 
@@ -671,6 +695,8 @@ static void debug_trace_execution(const VM_t* vm)
     (void)vm;
 #endif /* DEBUG_TRACE_EXECUTION */
 }
+
+
 
 
 
@@ -726,6 +752,16 @@ static bool call_value(VM_t* vm, Value_t callee, int argc)
     {
         ObjClass_t* klass = AS_CLASS(callee);
         vm->sp[-argc - 1] = OBJ_VAL(ObjIns_Create(vm, klass));
+        Value_t initializer;
+        if (Table_Get(&klass->methods, vm->init_str, &initializer)) 
+        {
+            return call(vm, AS_CLOSURE(initializer), argc);
+        }
+        else if (argc != 0)
+        {
+            runtime_error(vm, "Expected 0 arguments but got %d.", argc);
+            return false;
+        }
         return true;
     }
     break;
@@ -767,7 +803,7 @@ static bool call(VM_t* vm, ObjClosure_t* closure, int argc)
     CallFrame_t* current = &vm->frames[vm->frame_count++];
     current->closure = closure;
     current->ip = closure->fun->chunk.code;
-    current->base = vm->sp - argc - 1;
+    current->bp = vm->sp - argc - 1;
     return true;
 }
 
@@ -780,32 +816,32 @@ static bool call_native(VM_t* vm, ObjNativeFn_t* native, int argc)
         return false;
     }
 
-    Value_t* base_args = vm->sp - argc;
-    Value_t ret = native->fn(argc, base_args);
-    vm->sp = base_args;
+    Value_t* bp_args = vm->sp - argc;
+    Value_t ret = native->fn(argc, bp_args);
+    vm->sp = bp_args;
     vm->sp[-1] = ret;
     return true;
 }
 
 
 
-static ObjUpval_t* capture_upval(VM_t* vm, Value_t* base)
+static ObjUpval_t* capture_upval(VM_t* vm, Value_t* bp)
 {
     ObjUpval_t* prev = NULL;
     ObjUpval_t* curr = vm->open_upvals;
-    while (NULL != curr && curr->location > base)
+    while (NULL != curr && curr->location > bp)
     {
         prev = curr;
         curr = curr->next;
     }
 
-    if (NULL != curr && base == curr->location)
+    if (NULL != curr && bp == curr->location)
     {
         return curr;
     }
 
 
-    ObjUpval_t* new_upval = ObjUpv_Create(vm, base);
+    ObjUpval_t* new_upval = ObjUpv_Create(vm, bp);
     new_upval->next = curr;
     if (NULL == prev)
     {
@@ -820,10 +856,10 @@ static ObjUpval_t* capture_upval(VM_t* vm, Value_t* base)
 
 
 
-static void close_upval(VM_t* vm, Value_t* base)
+static void close_upval(VM_t* vm, Value_t* bp)
 {
     while (NULL != vm->open_upvals 
-        && vm->open_upvals->location >= base)
+        && vm->open_upvals->location >= bp)
     {
         ObjUpval_t* upval = vm->open_upvals;
         upval->closed = *upval->location;
@@ -849,7 +885,7 @@ static void define_method(VM_t* vm, ObjString_t* class_name)
 static bool bind_method(VM_t* vm, ObjClass_t* klass, ObjString_t* name)
 {
     Value_t method;
-    if (Table_Get(&klass->methods, name, &method))
+    if (!Table_Get(&klass->methods, name, &method))
     {
         runtime_error(vm, "Undefined property '%s'.", name->cstr);
         return false;
@@ -861,3 +897,42 @@ static bool bind_method(VM_t* vm, ObjClass_t* klass, ObjString_t* name)
     VM_Push(vm, OBJ_VAL(bound_method));
     return true;
 }
+
+
+
+
+static bool invoke_method(VM_t* vm, const ObjString_t* method_name, int argc)
+{
+    Value_t receiver = peek(vm, argc);
+
+    if (!IS_INSTANCE(receiver))
+    {
+        runtime_error(vm, "Only instances have methods.");
+        return false;
+    }
+    
+
+    ObjInstance_t* instance = AS_INSTANCE(receiver);
+    Value_t property_method;
+    if (Table_Get(&instance->fields, method_name, &property_method))
+    {
+        vm->sp[-argc - 1] = property_method; /* replaces 'this' pointer */
+        return call_value(vm, property_method, argc);
+    }
+
+    return invoke_class_method(vm, instance->klass, method_name, argc);
+}
+
+
+static bool invoke_class_method(VM_t* vm, ObjClass_t* klass, const ObjString_t* method_name, int argc)
+{
+    Value_t method;
+    if (!Table_Get(&klass->methods, method_name, &method))
+    {
+        runtime_error(vm, "Undefined property '%s'.", method_name->cstr);
+        return false;
+    }
+    return call(vm, AS_CLOSURE(method), argc);
+}
+
+

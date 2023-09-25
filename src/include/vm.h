@@ -24,7 +24,7 @@ typedef struct CallFrame_t
 {
     ObjClosure_t* closure;
     uint8_t* ip;
-    Value_t* base;
+    Value_t* bp;
 } CallFrame_t;
 
 
@@ -35,6 +35,7 @@ struct VM_t
     Table_t globals;
     ObjUpval_t* open_upvals;
     Obj_t* head;
+    ObjString_t* init_str;
 
     int gray_count;
     int gray_capacity;
@@ -72,6 +73,10 @@ bool VM_Push(VM_t* vm, Value_t val);
 
 /* pops a value off the vm's stack */
 Value_t VM_Pop(VM_t* vm);
+
+
+/* print all elems in the vm's stack */
+void VM_PrintStack(FILE* fout, const VM_t* vm);
 
 
 /*

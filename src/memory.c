@@ -116,8 +116,6 @@ void* Allocator_Alloc(Allocator_t* allocator, bufsize_t nbytes)
 {
 	FreeHeader_t* node = get_free_node(allocator, nbytes);
 
-    DEBUG_ALLOC_PRINT("\nAllocated pointer: %p, size: %u", GET_PTR(node), (unsigned)node->capacity);
-    dbg_print_nodes(*allocator, "Allocating");
 	if (NULL == node)
 	{
 		fprintf(stderr, 
@@ -126,6 +124,8 @@ void* Allocator_Alloc(Allocator_t* allocator, bufsize_t nbytes)
 		);
 		exit(EXIT_FAILURE);
 	}
+    DEBUG_ALLOC_PRINT("\nAllocated pointer: %p, size: %u\n", GET_PTR(node), (unsigned)node->capacity);
+    dbg_print_nodes(*allocator, "Allocating");
 
 
 	return GET_PTR(node);
@@ -145,10 +145,13 @@ void* Allocator_Realloc(Allocator_t* allocator, void* ptr, bufsize_t newsize)
         return NULL;
     }
 
+
     FreeHeader_t* header = GET_HEADER(ptr);
     if (header->capacity < newsize)
     {
-        dbg_print_nodes(*allocator, "Resizing");
+        DEBUG_ALLOC_PRINT("Resizing pointer %p from %zu to %zu\n", 
+            ptr, header->capacity, newsize
+        );
         if (!extend_capacity(allocator, header, NODE_ALIVE, newsize))
         {
             void* newbuf = Allocator_Alloc(allocator, newsize);
@@ -191,7 +194,7 @@ void Allocator_Free(Allocator_t* allocator, void* ptr)
 #endif /* DEBUG_ALLOCATION_CHK */
 
 
-    DEBUG_ALLOC_PRINT("\nFreeing pointer: %p, size: %u", ptr, (unsigned)(GET_HEADER(ptr)->capacity));
+    DEBUG_ALLOC_PRINT("\nFreeing pointer: %p, size: %zu\n", ptr, (GET_HEADER(ptr)->capacity));
     dbg_print_nodes(*allocator, "Freeing");
 	insert_free_node(allocator, GET_HEADER(ptr));
 }
@@ -255,6 +258,7 @@ void GC_CollectGarbage(VM_t* vm)
     DEBUG_GC_PRINT("-- gc begin\n");
 
     size_t before_gc = vm->bytes_allocated;
+    (void)before_gc;
 
     gc_mark_root(vm);
     gc_trace_references(vm);
@@ -423,11 +427,6 @@ static FreeHeader_t* get_free_node(Allocator_t* allocator, bufsize_t nbytes)
 }
 
 
-void panic()
-{
-    CLOX_ASSERT(false && "panic");
-}
-
 
 static void insert_free_node(Allocator_t* allocator, FreeHeader_t* node)
 {
@@ -449,11 +448,7 @@ static void insert_free_node(Allocator_t* allocator, FreeHeader_t* node)
 		prev = curr;
 		curr = curr->next;
 	}
-    if (curr == node)
-    {
-        panic();
-        CLOX_ASSERT(curr != node && "double free");
-    }
+    CLOX_ASSERT(curr != node && "double free");
 
 
     if (NULL == curr)
@@ -534,20 +529,20 @@ static void set_header(FreeHeader_t* header, size_t capacity, FreeHeader_t* next
 static void dbg_print_nodes(const Allocator_t allocator, const char* title)
 {
 #ifdef ALLOCATOR_DEBUG
-    fprintf(stdout, "\n <== ALLOCATOR: %s ==> \n", title);
+    fprintf(ALLOC_LOG_FILE, "\n <== ALLOCATOR: %s ==> \n", title);
     const FreeHeader_t* node = allocator.free_head;
     int indent = 0;
     while (NULL != node)
     {
-        fprintf(stdout, "%-*sNode %p: capacity: %zu\n", indent, " ", (void*)node, node->capacity);
+        fprintf(ALLOC_LOG_FILE, "%-*sNode %p: capacity: %zu\n", indent, " ", (void*)node, node->capacity);
         indent += 2;
         node = node->next;
     }
-    fprintf(stdout, "\n");
+    fprintf(ALLOC_LOG_FILE, "\n");
 #else
     (void)allocator;
     (void)title;
-#endif 
+#endif /* ALLOCATOR_DEBUG */
 }
 
 
@@ -579,6 +574,7 @@ static void gc_mark_root(VM_t* vm)
 
     Table_Mark(&vm->globals);
     Compiler_MarkObj(vm->compiler);
+    GC_MarkObj(vm, (Obj_t*)vm->init_str);
 }
 
 

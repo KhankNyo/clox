@@ -17,7 +17,7 @@ static size_t const_instruction(FILE* fout,
 );
 
 static size_t bytes_instruction(FILE* fout, 
-    const char* mnemonic, const Chunk_t* chunk, size_t offset, unsigned arg_size
+    const char* mnemonic, const Chunk_t* chunk, size_t offset, unsigned argsize
 );
 static size_t jump_instruction(FILE* fout, 
     const char* mnemonic, int sign, const Chunk_t* chunk, size_t offset
@@ -25,6 +25,11 @@ static size_t jump_instruction(FILE* fout,
 #define byte_instruction(f, mne, cnk, off)\
     bytes_instruction(f, mne, cnk, off, 1)
 #define INS_FMTSTR "%-24s "
+
+
+static size_t invoke_instruction(FILE* fout,
+    const char *mnemonic, const Chunk_t *chunk, size_t offset, size_t name_size
+);
 
 
 
@@ -184,6 +189,10 @@ size_t Disasm_Instruction(FILE* fout, const Chunk_t* chunk, size_t offset)
         offset = byte_instruction(fout, "OP_CALL", chunk, offset); 
         break;
 
+    case OP_INVOKE:
+        offset = invoke_instruction(fout, "OP_INVOKE", chunk, offset, 1);
+        break;
+
     case OP_SET_UPVALUE:
         offset = byte_instruction(fout, "OP_SET_UPVALUE", chunk, offset);
         break;
@@ -243,6 +252,8 @@ size_t Disasm_Instruction(FILE* fout, const Chunk_t* chunk, size_t offset)
 
 
 
+
+
 	default:
 		fprintf(fout, "Unknown opcode %d", ins);
 		offset += 1;
@@ -255,6 +266,20 @@ size_t Disasm_Instruction(FILE* fout, const Chunk_t* chunk, size_t offset)
 
 
 
+
+
+
+
+
+static uint64_t read_arg(const Chunk_t* chunk, size_t offset, unsigned argsize)
+{
+    uint64_t arg = 0;
+    for (unsigned i = 0; i < argsize; i++)
+    {
+        arg |= (uint64_t)chunk->code[offset + i + 1] << (argsize - i - 1)*8;
+    }
+    return arg;
+}
 
 
 
@@ -271,12 +296,7 @@ static size_t const_instruction(FILE* fout,
 {
     CLOX_ASSERT(chunk->consts.vals != NULL);
 
-	size_t const_addr = 0;
-	for (unsigned i = 0; i < addr_size; i++)
-	{
-		const_addr |= (size_t)chunk->code[offset + 1 + i] << (addr_size - i - 1)*8;
-	}
-
+	uint64_t const_addr = read_arg(chunk, offset + 1, addr_size);
 	fprintf(fout, INS_FMTSTR"%4zu ", mnemonic, const_addr);
 	Value_Print(fout, chunk->consts.vals[const_addr]);
 	return offset + 1 + addr_size;
@@ -285,17 +305,14 @@ static size_t const_instruction(FILE* fout,
 
 
 static size_t bytes_instruction(FILE* fout, 
-    const char* mnemonic, const Chunk_t* chunk, size_t offset, unsigned arg_size
+    const char* mnemonic, const Chunk_t* chunk, size_t offset, unsigned argsize
 )
 {
-    CLOX_ASSERT(arg_size < sizeof(uint64_t) && "Unsupported arg size");
-    uint64_t operand = 0;
-    for (unsigned i = 0; i < arg_size; i++)
-    {
-        operand |= (uint64_t)chunk->code[offset + i + 1] << (arg_size - i - 1)*8;
-    }
+    CLOX_ASSERT(argsize < sizeof(uint64_t) && "Unsupported arg size");
+
+    uint64_t operand = read_arg(chunk, offset + 1, argsize);
     fprintf(fout, INS_FMTSTR"%4llu", mnemonic, operand);
-    return offset + 1 + arg_size;
+    return offset + 1 + argsize;
 }
 
 
@@ -303,12 +320,25 @@ static size_t jump_instruction(FILE* fout,
     const char* mnemonic, int sign, const Chunk_t* chunk, size_t offset
 )
 {
-    uint16_t jump_offset = 
-        ((uint16_t)chunk->code[offset + 1] << 8)
-        | chunk->code[offset + 2];
+    uint16_t jump_offset = (uint16_t)read_arg(chunk, offset + 1, 2);
 
     fprintf(fout, INS_FMTSTR"%4d -> %zu", mnemonic, jump_offset,
         offset + 3 + sign * jump_offset
     );
     return offset + 3;
+}
+
+
+
+static size_t invoke_instruction(FILE* fout,
+    const char *mnemonic, const Chunk_t *chunk, size_t offset, size_t name_size
+)
+{
+    unsigned name = read_arg(chunk, offset + 1, name_size);
+    uint8_t argc = read_arg(chunk, offset + name_size + 1, 1);
+
+    fprintf(fout, "%-16s (%d args) %4d", mnemonic, argc, name);
+    Value_Print(fout, chunk->consts.vals[name]);
+    fputc('\n', fout);
+    return offset + 1 + name_size + 1;
 }

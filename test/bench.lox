@@ -1,0 +1,38 @@
+
+
+
+class Test
+{	
+	init() {
+		this.aaaa = nil;
+		this.bbbb = nil;
+		this.cccc = nil;
+		this.test = nil;
+		this.hash = nil;
+		this.that = nil;
+	}
+	call() {}
+}
+
+fun call() {}
+
+
+fun benchmark(n)
+{
+	var test = Test();
+	test.call = call;	
+	var start = clock();
+
+
+	var i = 0;
+	while (i < n)
+	{
+		test.call();
+		i += 1;
+	}
+
+	print clock() - start;
+}
+
+
+benchmark(100000);

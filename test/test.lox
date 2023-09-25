@@ -1,33 +1,15 @@
+class CoffeeMaker {
+    init(coffee) {
+        this.coffee = coffee;
+    }
 
-class Node {}
+    brew() {
+        print "Enjoy your cup of " + this.coffee;
 
-fun NodeInit(val) {
-    var node = Node();
-    node.next = nil;
-    node.val = val;
-    return node;
-}
-
-fun NodeAt(node, index) {
-    while ((index -= 1) > 0) {
-        node = node.next;
+        // No reusing the grounds!
+        this.coffee = nil;
     }
 }
 
-fun NodePrint(node) {
-    while (node != nil) {
-        print node.val;
-        node = node.next;
-    }
-}
-
-
-var node = NodeInit(0);
-var tmp = node;
-for (var i = 1; i < 10; i += 1) {
-    tmp.next = NodeInit(i);
-    tmp = tmp.next;
-}
-
-
-NodePrint(node);
+var maker = CoffeeMaker("coffee and chicory");
+maker.brew();
