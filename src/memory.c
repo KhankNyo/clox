@@ -152,7 +152,6 @@ void* Allocator_Realloc(Allocator_t* allocator, void* ptr, bufsize_t newsize)
         DEBUG_ALLOC_PRINT("Resizing pointer %p from %zu to %zu\n", 
             ptr, header->capacity, newsize
         );
-        dbg_print_nodes(*allocator, "Resizing");
         if (!extend_capacity(allocator, header, NODE_ALIVE, newsize))
         {
             void* newbuf = Allocator_Alloc(allocator, newsize);
