@@ -10,7 +10,7 @@
 
 
 
-typedef Value_t (*NativeFn_t)(int argc, Value_t* argv);
+typedef Value_t (*NativeFn_t)(VM_t* vm, int argc, Value_t* argv);
 
 #define OBJ_TYPE(value)     (AS_OBJ(value)->type)
 

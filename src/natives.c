@@ -9,9 +9,9 @@
 
 
 
-Value_t Native_Clock(int argc, Value_t* argv)
+Value_t Native_Clock(VM_t* vm, int argc, Value_t* argv)
 {
-    (void)argc, (void)argv;
+    (void)argc, (void)argv, (void)vm;
     return NUMBER_VAL((double)clock() / CLOCKS_PER_SEC);
 }
 

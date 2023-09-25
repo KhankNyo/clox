@@ -193,6 +193,10 @@ size_t Disasm_Instruction(FILE* fout, const Chunk_t* chunk, size_t offset)
         offset = invoke_instruction(fout, "OP_INVOKE", chunk, offset, 1);
         break;
 
+    case OP_SUPER_INVOKE:
+        offset = invoke_instruction(fout, "OP_SUPER_INVOKE", chunk, offset, 1);
+        break;
+
     case OP_SET_UPVALUE:
         offset = byte_instruction(fout, "OP_SET_UPVALUE", chunk, offset);
         break;
@@ -211,6 +215,10 @@ size_t Disasm_Instruction(FILE* fout, const Chunk_t* chunk, size_t offset)
         break;
     case OP_GET_PROPERTY_LONG:
         offset = const_instruction(fout, "OP_GET_PROPERTY_LONG", chunk, offset, 3);
+        break;
+
+    case OP_GET_SUPER:
+        offset = const_instruction(fout, "OP_GET_SUPER", chunk, offset, 1);
         break;
         
     case OP_CLOSURE:
@@ -239,6 +247,10 @@ size_t Disasm_Instruction(FILE* fout, const Chunk_t* chunk, size_t offset)
 
     case OP_CLASS:
         offset = const_instruction(fout, "OP_CLASS", chunk, offset, 1);
+        break;
+
+    case OP_INHERIT:
+        offset = single_byte(fout, "OP_INHERIT", offset);
         break;
 
     case OP_DUP:

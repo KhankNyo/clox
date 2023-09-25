@@ -188,8 +188,6 @@ InterpretResult_t VM_Interpret(VM_t* vm, const char* src)
 
 static InterpretResult_t run(VM_t* vm)
 {
-    CLOX_ASSERT(vm->frame_count > 0);
-    CallFrame_t* current = peek_cf(vm, 0);
 
     /* these macros make me sick */
 
@@ -200,6 +198,8 @@ do{\
 }while(0)
 
 #define POP() VM_Pop(vm)
+
+#define CALLFRAME_POP() peek_cf(vm, 0)
 
 
 #define GET_IP() (current->ip)
@@ -292,6 +292,8 @@ do{\
 
 
 
+    CLOX_ASSERT(vm->frame_count > 0);
+    CallFrame_t* current = CALLFRAME_POP();
 
 
     while (true)
@@ -427,7 +429,7 @@ do{\
             {
                 return INTERPRET_RUNTIME_ERROR;
             }
-            current = peek_cf(vm, 0);
+            current = CALLFRAME_POP();
             if (NULL == current)
             {
                 return INTERPRET_RUNTIME_ERROR;
@@ -443,7 +445,21 @@ do{\
             {
                 return INTERPRET_RUNTIME_ERROR;
             }
-            current = peek_cf(vm, 0);
+            current = CALLFRAME_POP();
+        }
+        break;
+
+        case OP_SUPER_INVOKE:
+        {
+            ObjString_t* method_name = READ_STR();
+            int argc = READ_BYTE();
+
+            ObjClass_t* superclass = AS_CLASS(POP());
+            if (!invoke_class_method(vm, superclass, method_name, argc))
+            {
+                return INTERPRET_RUNTIME_ERROR;
+            }
+            current = CALLFRAME_POP();
         }
         break;
 
@@ -471,6 +487,18 @@ do{\
         case OP_GET_PROPERTY_LONG:  GET_PROPERTY(READ_STR_LONG); break;
         case OP_SET_PROPERTY:       SET_PROPERTY(READ_STR); break;
         case OP_SET_PROPERTY_LONG:  SET_PROPERTY(READ_STR_LONG); break;
+
+        case OP_GET_SUPER:
+        {
+            ObjString_t* method_name = READ_STR();
+            ObjClass_t* superclass = AS_CLASS(POP());
+            
+            if (!bind_method(vm, superclass, method_name))
+            {
+                return INTERPRET_RUNTIME_ERROR;
+            }
+        }
+        break;
 
         case OP_CLOSURE:
         {
@@ -513,7 +541,7 @@ do{\
 
             vm->sp = current->bp;
             PUSH(val);
-            current = peek_cf(vm, 0);
+            current = CALLFRAME_POP();
         }
         break;
         
@@ -521,6 +549,20 @@ do{\
         {
             ObjClass_t* klass = ObjCla_Create(vm, READ_STR());
             PUSH(OBJ_VAL(klass));
+        }
+        break;
+
+        case OP_INHERIT:
+        {
+            Value_t superclass = peek(vm, 1);
+            if (!IS_CLASS(superclass))
+            {
+                runtime_error(vm, "Superclass must be a class (duh).");
+                return INTERPRET_RUNTIME_ERROR;
+            }
+            ObjClass_t *subclass = AS_CLASS(peek(vm, 0));
+            Table_AddAll(&AS_CLASS(superclass)->methods, &subclass->methods);
+            POP(); /* the subclass */
         }
         break;
 
@@ -554,6 +596,7 @@ do{\
 #undef READ_LONG
 #undef READ_SHORT
 #undef POP
+#undef CALLFRAME_POP
 #undef PUSH
 #undef GET_IP
 #undef GET_PROPERTY
@@ -816,9 +859,9 @@ static bool call_native(VM_t* vm, ObjNativeFn_t* native, int argc)
         return false;
     }
 
-    Value_t* bp_args = vm->sp - argc;
-    Value_t ret = native->fn(argc, bp_args);
-    vm->sp = bp_args;
+    Value_t* argv = vm->sp - argc;
+    Value_t ret = native->fn(vm, argc, argv);
+    vm->sp = argv;
     vm->sp[-1] = ret;
     return true;
 }

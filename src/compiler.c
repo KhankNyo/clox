@@ -80,6 +80,7 @@ typedef struct CompilerData_t
 typedef struct ClassData_t
 {
     struct ClassData_t* prev;
+    bool has_super;
 } ClassData_t;
 
 struct Compiler_t
@@ -137,6 +138,11 @@ static bool identifiers_equal(const Token_t a, const Token_t b);
 static int resolve_local(CompilerData_t* data, Parser_t* parser, const Token_t name);
 static int resolve_upval(CompilerData_t* data, Parser_t* parser, const Token_t name);
 
+
+
+/* creates a token that's not in the source */
+static Token_t synthetic_token(const char* text);
+
 /* define a global variable */
 static void define_variable(Compiler_t* compiler, size_t global_index);
 
@@ -180,22 +186,23 @@ static void stmt_return(Compiler_t* compiler);
 /* parses an expression */
 static void expression(Compiler_t* compiler);
 
-static void string(Compiler_t* compiler, bool can_assign);
-static void literal(Compiler_t* compiler, bool can_assign);
-static void number(Compiler_t* compiler, bool can_assign);
-static void grouping(Compiler_t* compiler, bool can_assign);
-static void unary(Compiler_t* compiler, bool can_assign);
-static void binary(Compiler_t* compiler, bool can_assign);
-static void variable(Compiler_t* compiler, bool can_assign);
+static void expr_string(Compiler_t* compiler, bool can_assign);
+static void expr_literal(Compiler_t* compiler, bool can_assign);
+static void expr_number(Compiler_t* compiler, bool can_assign);
+static void expr_grouping(Compiler_t* compiler, bool can_assign);
+static void expr_unary(Compiler_t* compiler, bool can_assign);
+static void expr_binary(Compiler_t* compiler, bool can_assign);
+static void expr_variable(Compiler_t* compiler, bool can_assign);
 /* get or set a variable with the given name */
-static void named_variable(Compiler_t* compiler, const Token_t name, bool can_assign);
-static void and_(Compiler_t* compiler, bool can_assign);
-static void or_(Compiler_t* compiler, bool can_assign);
-static void assignment(Compiler_t* compiler, Opc_t set_op, Opc_t get_op, unsigned arg);
-static void call(Compiler_t* compiler, bool can_assign);
-static uint8_t arglist(Compiler_t* compiler);
-static void dot(Compiler_t* compiler, bool can_assign);
-static void this_(Compiler_t* compiler, bool can_assign);
+    static void load_variable(Compiler_t* compiler, const Token_t name, bool can_assign);
+static void expr_and(Compiler_t* compiler, bool can_assign);
+static void expr_or(Compiler_t* compiler, bool can_assign);
+static void expr_assignment(Compiler_t* compiler, Opc_t set_op, Opc_t get_op, unsigned arg);
+static void expr_call(Compiler_t* compiler, bool can_assign);
+    static uint8_t arglist(Compiler_t* compiler);
+static void expr_dot(Compiler_t* compiler, bool can_assign);
+static void expr_this(Compiler_t* compiler, bool can_assign);
+static void expr_super(Compiler_t* compiler, bool can_assign);
 
 
 
@@ -267,42 +274,42 @@ static void synchronize(Compiler_t* compiler);
 
 static const ParseRule_t s_rules[] = 
 {
-  [TOKEN_LEFT_PAREN]    = {grouping, call,   PREC_CALL},
+  [TOKEN_LEFT_PAREN]    = {expr_grouping, expr_call,   PREC_CALL},
   [TOKEN_RIGHT_PAREN]   = {NULL,     NULL,   PREC_NONE},
   [TOKEN_LEFT_BRACE]    = {NULL,     NULL,   PREC_NONE}, 
   [TOKEN_RIGHT_BRACE]   = {NULL,     NULL,   PREC_NONE},
   [TOKEN_COMMA]         = {NULL,     NULL,   PREC_NONE},
-  [TOKEN_DOT]           = {NULL,     dot,    PREC_CALL},
-  [TOKEN_MINUS]         = {unary,    binary, PREC_TERM},
-  [TOKEN_PLUS]          = {unary,    binary, PREC_TERM},
+  [TOKEN_DOT]           = {NULL,     expr_dot,    PREC_CALL},
+  [TOKEN_MINUS]         = {expr_unary,    expr_binary, PREC_TERM},
+  [TOKEN_PLUS]          = {expr_unary,    expr_binary, PREC_TERM},
   [TOKEN_SEMICOLON]     = {NULL,     NULL,   PREC_NONE},
-  [TOKEN_SLASH]         = {NULL,     binary, PREC_FACTOR},
-  [TOKEN_STAR]          = {NULL,     binary, PREC_FACTOR},
-  [TOKEN_BANG]          = {unary,    NULL,   PREC_NONE},
-  [TOKEN_EQUAL_EQUAL]   = {NULL,     binary, PREC_EQUALITY},
+  [TOKEN_SLASH]         = {NULL,     expr_binary, PREC_FACTOR},
+  [TOKEN_STAR]          = {NULL,     expr_binary, PREC_FACTOR},
+  [TOKEN_BANG]          = {expr_unary,    NULL,   PREC_NONE},
+  [TOKEN_EQUAL_EQUAL]   = {NULL,     expr_binary, PREC_EQUALITY},
   [TOKEN_EQUAL]         = {NULL,     NULL,   PREC_NONE},
-  [TOKEN_BANG_EQUAL]    = {NULL,     binary, PREC_EQUALITY},
-  [TOKEN_GREATER]       = {NULL,     binary, PREC_COMPARISON},
-  [TOKEN_GREATER_EQUAL] = {NULL,     binary, PREC_COMPARISON},
-  [TOKEN_LESS]          = {NULL,     binary, PREC_COMPARISON},
-  [TOKEN_LESS_EQUAL]    = {NULL,     binary, PREC_COMPARISON},
-  [TOKEN_IDENTIFIER]    = {variable, NULL,   PREC_NONE},
-  [TOKEN_STRING]        = {string,   NULL,   PREC_NONE},
-  [TOKEN_NUMBER]        = {number,   NULL,   PREC_NONE},
-  [TOKEN_AND]           = {NULL,     and_,   PREC_AND},
+  [TOKEN_BANG_EQUAL]    = {NULL,     expr_binary, PREC_EQUALITY},
+  [TOKEN_GREATER]       = {NULL,     expr_binary, PREC_COMPARISON},
+  [TOKEN_GREATER_EQUAL] = {NULL,     expr_binary, PREC_COMPARISON},
+  [TOKEN_LESS]          = {NULL,     expr_binary, PREC_COMPARISON},
+  [TOKEN_LESS_EQUAL]    = {NULL,     expr_binary, PREC_COMPARISON},
+  [TOKEN_IDENTIFIER]    = {expr_variable, NULL,   PREC_NONE},
+  [TOKEN_STRING]        = {expr_string,   NULL,   PREC_NONE},
+  [TOKEN_NUMBER]        = {expr_number,   NULL,   PREC_NONE},
+  [TOKEN_AND]           = {NULL,     expr_and,   PREC_AND},
   [TOKEN_CLASS]         = {NULL,     NULL,   PREC_NONE},
   [TOKEN_ELSE]          = {NULL,     NULL,   PREC_NONE},
-  [TOKEN_FALSE]         = {literal,  NULL,   PREC_NONE},
+  [TOKEN_FALSE]         = {expr_literal,  NULL,   PREC_NONE},
   [TOKEN_FOR]           = {NULL,     NULL,   PREC_NONE},
   [TOKEN_FUN]           = {NULL,     NULL,   PREC_NONE},
   [TOKEN_IF]            = {NULL,     NULL,   PREC_NONE},
-  [TOKEN_NIL]           = {literal,  NULL,   PREC_NONE},
-  [TOKEN_OR]            = {NULL,     or_,    PREC_OR},
+  [TOKEN_NIL]           = {expr_literal,  NULL,   PREC_NONE},
+  [TOKEN_OR]            = {NULL,     expr_or,    PREC_OR},
   [TOKEN_PRINT]         = {NULL,     NULL,   PREC_NONE},
   [TOKEN_RETURN]        = {NULL,     NULL,   PREC_NONE},
-  [TOKEN_SUPER]         = {NULL,     NULL,   PREC_NONE},
-  [TOKEN_THIS]          = {this_,    NULL,   PREC_NONE},
-  [TOKEN_TRUE]          = {literal,  NULL,   PREC_NONE},
+  [TOKEN_SUPER]         = {expr_super,     NULL,   PREC_NONE},
+  [TOKEN_THIS]          = {expr_this,    NULL,   PREC_NONE},
+  [TOKEN_TRUE]          = {expr_literal,  NULL,   PREC_NONE},
   [TOKEN_VAR]           = {NULL,     NULL,   PREC_NONE},
   [TOKEN_WHILE]         = {NULL,     NULL,   PREC_NONE},
   [TOKEN_ERROR]         = {NULL,     NULL,   PREC_NONE},
@@ -622,6 +629,15 @@ static int resolve_upval(CompilerData_t* data, Parser_t* parser, const Token_t n
 
 
 
+static Token_t synthetic_token(const char* text)
+{
+    return (Token_t){
+        .len = strlen(text),
+        .start = text,
+    };
+}
+
+
 
 static void define_variable(Compiler_t* compiler, size_t global_index)
 {
@@ -750,12 +766,37 @@ static void decl_class(Compiler_t* compiler)
     emit_2_bytes(compiler, OP_CLASS, named_constant);
     define_variable(compiler, named_constant);
 
+
     /* pushes class data */
     ClassData_t class_data;
+    class_data.has_super = false;
     class_data.prev = compiler->current_class;
     compiler->current_class = &class_data;
 
-    named_variable(compiler, class_name, false);
+
+    if (match(compiler, TOKEN_LESS))
+    {
+        class_data.has_super = true;
+
+        consume(compiler, TOKEN_IDENTIFIER, "Expected superclass name.");
+        if (identifiers_equal(compiler->parser.prev, class_name))
+        {
+            error(&compiler->parser, "A class cannot inherit from itself.");
+        }
+
+        /* emit super and subclass for OP_INHERIT */
+        expr_variable(compiler, false);                 /* superclass */
+
+        scope_begin(compiler);
+        add_local(compiler, synthetic_token("super"));
+        define_variable(compiler, 0);
+
+        load_variable(compiler, class_name, false);    /* subclass */
+        emit_byte(compiler, OP_INHERIT);
+    }
+
+
+    load_variable(compiler, class_name, false);
 
 
     consume(compiler, TOKEN_LEFT_BRACE, "Expected '{' before class body.");
@@ -770,6 +811,10 @@ static void decl_class(Compiler_t* compiler)
     emit_pop(compiler, 1); /* pops the class name */
 
     /* pops class data */
+    if (compiler->current_class->has_super)
+    {
+        scope_end(compiler);
+    }
     compiler->current_class = class_data.prev;
 }
 
@@ -1143,7 +1188,7 @@ static void expression(Compiler_t* compiler)
 
 
 
-static void string(Compiler_t* compiler, bool can_assign)
+static void expr_string(Compiler_t* compiler, bool can_assign)
 {
     (void)can_assign;
     emit_constant(compiler, 
@@ -1154,7 +1199,7 @@ static void string(Compiler_t* compiler, bool can_assign)
 }
 
 
-static void literal(Compiler_t* compiler, bool can_assign)
+static void expr_literal(Compiler_t* compiler, bool can_assign)
 {
     (void)can_assign;
     switch (compiler->parser.prev.type)
@@ -1167,7 +1212,7 @@ static void literal(Compiler_t* compiler, bool can_assign)
 }
 
 
-static void number(Compiler_t* compiler, bool can_assign)
+static void expr_number(Compiler_t* compiler, bool can_assign)
 {
     (void)can_assign;
     const Value_t val = NUMBER_VAL(strtod(compiler->parser.prev.start, NULL));
@@ -1175,7 +1220,7 @@ static void number(Compiler_t* compiler, bool can_assign)
 }
 
 
-static void grouping(Compiler_t* compiler, bool can_assign)
+static void expr_grouping(Compiler_t* compiler, bool can_assign)
 {
     (void)can_assign;
     /* assumes that '(' is already consumed */
@@ -1184,7 +1229,7 @@ static void grouping(Compiler_t* compiler, bool can_assign)
 }
 
 
-static void unary(Compiler_t* compiler, bool can_assign)
+static void expr_unary(Compiler_t* compiler, bool can_assign)
 {
     (void)can_assign;
     const TokenType_t operator = compiler->parser.prev.type;
@@ -1205,7 +1250,7 @@ static void unary(Compiler_t* compiler, bool can_assign)
 }
 
 
-static void binary(Compiler_t* compiler, bool can_assign)
+static void expr_binary(Compiler_t* compiler, bool can_assign)
 {
     (void)can_assign;
     const TokenType_t operator = compiler->parser.prev.type;
@@ -1237,13 +1282,13 @@ static void binary(Compiler_t* compiler, bool can_assign)
 }
 
 
-static void variable(Compiler_t* compiler, bool can_assign)
+static void expr_variable(Compiler_t* compiler, bool can_assign)
 {
-    named_variable(compiler, compiler->parser.prev, can_assign);
+    load_variable(compiler, compiler->parser.prev, can_assign);
 }
 
 
-static void named_variable(Compiler_t* compiler, const Token_t name, bool can_assign)
+static void load_variable(Compiler_t* compiler, const Token_t name, bool can_assign)
 {
     uint8_t get_op, set_op;
     int arg = resolve_local(compiler->data, &compiler->parser, name);
@@ -1267,7 +1312,7 @@ static void named_variable(Compiler_t* compiler, const Token_t name, bool can_as
 
     if (can_assign && is_assignment_operator(compiler->parser.curr))
     {
-        assignment(compiler, set_op, get_op, (unsigned)arg);
+        expr_assignment(compiler, set_op, get_op, (unsigned)arg);
     }
     else 
     {
@@ -1277,7 +1322,7 @@ static void named_variable(Compiler_t* compiler, const Token_t name, bool can_as
 
 
 
-static void and_(Compiler_t* compiler, bool can_assign)
+static void expr_and(Compiler_t* compiler, bool can_assign)
 {
     (void)can_assign;
 
@@ -1289,7 +1334,7 @@ static void and_(Compiler_t* compiler, bool can_assign)
 }
 
 
-static void or_(Compiler_t* compiler, bool can_assign)
+static void expr_or(Compiler_t* compiler, bool can_assign)
 {
     (void)can_assign;
 
@@ -1303,7 +1348,7 @@ static void or_(Compiler_t* compiler, bool can_assign)
 }
 
 
-static void assignment(Compiler_t* compiler, Opc_t set_op, Opc_t get_op, unsigned arg)
+static void expr_assignment(Compiler_t* compiler, Opc_t set_op, Opc_t get_op, unsigned arg)
 { 
     if (match(compiler, TOKEN_EQUAL))
     {
@@ -1341,7 +1386,7 @@ static void assignment(Compiler_t* compiler, Opc_t set_op, Opc_t get_op, unsigne
 }
 
 
-static void call(Compiler_t* compiler, bool can_assign)
+static void expr_call(Compiler_t* compiler, bool can_assign)
 {
     (void)can_assign;
 
@@ -1370,7 +1415,7 @@ static uint8_t arglist(Compiler_t* compiler)
 
 
 
-static void dot(Compiler_t* compiler, bool can_assign)
+static void expr_dot(Compiler_t* compiler, bool can_assign)
 {
     consume(compiler, TOKEN_IDENTIFIER, "Expected property name after '.'.");
     size_t name = identifier_constant(compiler, compiler->parser.prev);
@@ -1381,7 +1426,7 @@ static void dot(Compiler_t* compiler, bool can_assign)
         {
             emit_byte(compiler, OP_DUP);
         }
-        assignment(compiler, OP_SET_PROPERTY, OP_GET_PROPERTY, name);
+        expr_assignment(compiler, OP_SET_PROPERTY, OP_GET_PROPERTY, name);
     }
     else if (match(compiler, TOKEN_LEFT_PAREN))
     {
@@ -1405,7 +1450,7 @@ static void dot(Compiler_t* compiler, bool can_assign)
 
 
 
-static void this_(Compiler_t* compiler, bool can_assign)
+static void expr_this(Compiler_t* compiler, bool can_assign)
 {
     (void)can_assign;
     if (NULL == compiler->current_class)
@@ -1413,7 +1458,42 @@ static void this_(Compiler_t* compiler, bool can_assign)
         error(&compiler->parser, "Can't use 'this' outside of a class.");
         return;
     }
-    variable(compiler, false);
+    expr_variable(compiler, false);
+}
+
+
+
+static void expr_super(Compiler_t* compiler, bool can_assign)
+{
+    (void)can_assign;
+    if (NULL == compiler->current_class)
+    {
+        error(&compiler->parser, "Can't use 'super' outside of a class.");
+    }
+    else if (!compiler->current_class->has_super)
+    {
+        error(&compiler->parser, "Can't use 'super' in a class with no superclass.");
+    }
+
+
+    consume(compiler, TOKEN_DOT, "Expected '.' after 'super'.");
+    consume(compiler, TOKEN_IDENTIFIER, "Expected superclass method name.");
+    int name = identifier_constant(compiler, compiler->parser.prev);
+
+    load_variable(compiler, synthetic_token("this"), false);
+
+    if (match(compiler, TOKEN_LEFT_PAREN))
+    {
+        int argc = arglist(compiler);
+        /* arglist prevents load_variable from being called before the if branch */
+        load_variable(compiler, synthetic_token("super"), false);
+        emit_bytes(compiler, 3, OP_SUPER_INVOKE, name, argc);
+    }
+    else 
+    {
+        load_variable(compiler, synthetic_token("super"), false);
+        emit_2_bytes(compiler, OP_GET_SUPER, name);
+    }
 }
 
 
