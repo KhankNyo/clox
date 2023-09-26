@@ -51,10 +51,11 @@ typedef struct
 #define AS_OBJ(value)		((value).as.obj)
 
 
-#define IS_BOOL(value)		((value).type == VAL_BOOL)
-#define IS_NIL(value)		((value).type == VAL_NIL)
-#define IS_NUMBER(value)	((value).type == VAL_NUMBER)
-#define IS_OBJ(value)		((value).type == VAL_OBJ)
+#define VALTYPE(value)      ((value).type)
+#define IS_BOOL(value)		(VALTYPE(value) == VAL_BOOL)
+#define IS_NIL(value)		(VALTYPE(value) == VAL_NIL)
+#define IS_NUMBER(value)	(VALTYPE(value) == VAL_NUMBER)
+#define IS_OBJ(value)		(VALTYPE(value) == VAL_OBJ)
 
 
 void ValArr_Init(ValueArr_t* valarr, VM_t* vm);

@@ -88,6 +88,14 @@ bool VM_DefineNative(VM_t* vm, const char* name, NativeFn_t fn, uint8_t argc);
 
 
 
+/* concatenate a with b and intern the result 
+ *  \returns the concatenation of a and b
+ *
+ *  NOTE: a and b will be pushed onto the stack as a precaution against the gc
+ */
+ObjString_t* VM_StrConcat(VM_t* vm, const ObjString_t* a, const ObjString_t* b);
+
+
 /* 
  *  interprets clox src code 
  *  \returns INTERPRET_RUNTIME_ERROR if a runtime error was encountered

@@ -199,7 +199,6 @@ ObjString_t* ObjStr_Copy(VM_t* vm, const char* cstr, int len);
 uint32_t ObjStr_HashStrs(int count, const ObjString_t* strings[static count]);
 
 
-#ifdef OBJSTR_FLEXIBLE_ARR
     /* 
      *  Creates a new ObjString_t object and reserve len + 1 bytes of memory
      *  \returns a pointer to the newly created ObjString_t object
@@ -213,7 +212,6 @@ uint32_t ObjStr_HashStrs(int count, const ObjString_t* strings[static count]);
      *  \returns false otherwise
      */
     bool ObjStr_Intern(VM_t* vm, ObjString_t* string);
-#else
 
     /*
      *  steals the pointer to the heapstr, 
@@ -225,7 +223,6 @@ uint32_t ObjStr_HashStrs(int count, const ObjString_t* strings[static count]);
      *  \returns the newly allocated string otherwise 
      */
     ObjString_t* ObjStr_Steal(VM_t* vm, char* heapstr, int len);
-#endif /* OBJSTR_FLEXIBLE_ARR */
 
 
 /* prints a val to fout stream */

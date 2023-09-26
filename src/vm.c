@@ -23,7 +23,6 @@ static void init_state(VM_t* vm, Allocator_t* alloc);
 static void stack_reset(VM_t* vm);
 static Value_t peek(const VM_t* vm, int offset);
 static bool is_falsey(const Value_t val);
-static void str_concatenate(VM_t* vm);
 
 static void runtime_error(VM_t* vm, const char* fmt, ...);
 static void debug_trace_execution(const VM_t* vm);
@@ -60,6 +59,7 @@ void VM_Init(VM_t* vm, Allocator_t* alloc)
     init_state(vm, alloc);
     vm->init_str = ObjStr_Copy(vm, "init", 4);
     CLOX_ASSERT(VM_DefineNative(vm, "clock", Native_Clock, 0));
+    CLOX_ASSERT(VM_DefineNative(vm, "toStr", Native_ToStr, 1));
 }
 
 void VM_Reset(VM_t* vm)
@@ -151,6 +151,59 @@ bool VM_DefineNative(VM_t* vm, const char* name, NativeFn_t fn, uint8_t argc)
     vm->sp -= 2;
     return true;
 }
+
+
+
+
+ObjString_t* VM_StrConcat(VM_t* vm, const ObjString_t* a, const ObjString_t* b)
+{
+    ObjString_t* result = NULL;
+    char* buf = NULL;
+    int len = a->len + b->len;
+    const ObjString_t* strs[] = { a, b };
+
+    if (!VM_Push(vm, OBJ_VAL(a))) goto push_a_failed;
+    if (!VM_Push(vm, OBJ_VAL(b))) goto push_b_failed;
+    
+
+    
+
+#ifdef OBJSTR_FLEXIBLE_ARR
+    uint32_t hash = ObjStr_HashStrs(2, strs); 
+    result = Table_FindStrs(&vm->strings, 2, strs, hash, len);
+    if (NULL == result)
+    {
+        result = ObjStr_Reserve(vm, len);
+        buf = result->cstr;
+
+        memcpy(buf, a->cstr, a->len);
+        memcpy(buf + a->len, b->cstr, b->len);
+        buf[len] = '\0';
+
+        ObjStr_Intern(vm, result);
+    }
+#else 
+    buf = ALLOCATE(vm, char, len + 1);
+    
+    memcpy(buf, a->cstr, a->len);
+    memcpy(buf + a->len, b->cstr, b->len);
+    buf[len] = '\0';
+
+    result = ObjStr_Steal(vm, buf, len);
+#endif /* OBJSTR_FLEXIBLE_ARR */
+
+
+
+    VM_Pop(vm); /* b */
+push_b_failed:
+    VM_Pop(vm); /* a */
+push_a_failed:
+    return result;
+}
+
+
+
+
 
 
 
@@ -323,7 +376,9 @@ do{\
         case OP_ADD:
             if (IS_STRING(peek(vm, 0)) && IS_STRING(peek(vm, 1)))
             {
-                str_concatenate(vm);
+                const ObjString_t* b = AS_STR(POP());
+                const ObjString_t* a = AS_STR(POP());
+                PUSH(OBJ_VAL(VM_StrConcat(vm, a, b)));
             }
             else if (IS_NUMBER(peek(vm, 0)) && IS_NUMBER(peek(vm, 1)))
             {
@@ -338,7 +393,24 @@ do{\
             }
             break;
         case OP_SUBTRACT:   BINARY_OP(NUMBER_VAL, - ); break;
-        case OP_MULTIPLY:   BINARY_OP(NUMBER_VAL, * ); break;
+        case OP_MULTIPLY:   
+            if (IS_STRING(peek(vm, 1)) && IS_NUMBER(peek(vm, 0)))
+            {
+                unsigned padcount = AS_NUMBER(POP());
+                const ObjString_t* original = AS_STR(POP());
+                ObjString_t* str = ObjStr_Copy(vm, original->cstr, original->len);
+                for (unsigned i = 0; i < padcount; i++)
+                {
+                    str = VM_StrConcat(vm, str, original);
+                }
+                PUSH(OBJ_VAL(str));
+            }
+            else 
+            {
+                BINARY_OP(NUMBER_VAL, * );
+            }
+            break;
+
         case OP_DIVIDE:     BINARY_OP(NUMBER_VAL, / ); break;
 
         case OP_EQUAL:
@@ -657,46 +729,6 @@ static bool is_falsey(const Value_t val)
         || (IS_NUMBER(val) && Value_Equal(val, NUMBER_VAL(0.0f)));
 }
 
-
-
-static void str_concatenate(VM_t* vm)
-{
-    ObjString_t* str_b = AS_STR(peek(vm, 0));
-    ObjString_t* str_a = AS_STR(peek(vm, 1));
-    ObjString_t* result = NULL;
-    int len = str_b->len + str_a->len;
-    char* buf = NULL;
-    
-#ifdef OBJSTR_FLEXIBLE_ARR
-    const ObjString_t* strs[] = {str_a, str_b};
-
-    uint32_t hash = ObjStr_HashStrs(2, strs); 
-    result = Table_FindStrs(&vm->strings, 2, strs, hash, len);
-    if (NULL == result)
-    {
-        result = ObjStr_Reserve(vm, len);
-        buf = result->cstr;
-
-        memcpy(buf, str_a->cstr, str_a->len);
-        memcpy(buf + str_a->len, str_b->cstr, str_b->len);
-        buf[len] = '\0';
-
-        ObjStr_Intern(vm, result);
-    }
-#else
-    buf = ALLOCATE(vm, char, len + 1);
-    
-    memcpy(buf, str_a->cstr, str_a->len);
-    memcpy(buf + str_a->len, str_b->cstr, str_b->len);
-    buf[len] = '\0';
-    
-    result = ObjStr_Steal(vm, buf, len);
-#endif /* OBJSTR_FLEXIBLE_ARR */
-
-    VM_Pop(vm);
-    VM_Pop(vm);
-    VM_Push(vm, OBJ_VAL(result));
-}
 
 
 

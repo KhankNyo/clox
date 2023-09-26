@@ -51,7 +51,7 @@ bool Table_Get(Table_t* table, const ObjString_t* key, Value_t* val_out);
  *  \returns false if the key already exist, the value associated with the key will be overwritten 
  *  to hold the given key and value
  *
- *  NOTE: the key will be pushed onto the vm's stack and then popped if the table resizes
+ *  NOTE: the key will be pushed onto the vm's stack and then popped if the table resizes, but not the value
  */
 bool Table_Set(Table_t* table, ObjString_t* key, Value_t val);
 

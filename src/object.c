@@ -20,9 +20,7 @@
 
 static void print_function(FILE* fout, const ObjFunction_t* fun);
 
-#ifndef OBJSTR_FLEXIBLE_ARR
 static ObjString_t* allocate_string(VM_t* vm, char* cstr, int len, uint32_t hash);
-#endif /* OBJSTR_FLEXIBLE_ARR */
 
 static Obj_t* allocate_obj(VM_t* vm, size_t nbytes, ObjType_t type);
 static uint32_t hash_str(const char* str, int len);
@@ -253,13 +251,19 @@ uint32_t ObjStr_HashStrs(int count, const ObjString_t* strings[static count])
 
 
 
-#ifdef OBJSTR_FLEXIBLE_ARR
 
 ObjString_t* ObjStr_Reserve(VM_t* vm, int len)
 {
-    ObjString_t* string = (ObjString_t*)allocate_obj(
+    ObjString_t* string;
+#ifdef OBJSTR_FLEXIBLE_ARR
+    string = (ObjString_t*)allocate_obj(
         vm, sizeof(*string) + len + 1, OBJ_STRING
     );
+#else
+    string = ALLOCATE_OBJ(vm, ObjString_t, OBJ_STRING);
+    string->cstr = ALLOCATE(vm, char, len + 1);
+#endif /* OBJSTR_FLEXIBLE_ARR */
+
     string->len = len;
     return string;
 }
@@ -267,16 +271,11 @@ ObjString_t* ObjStr_Reserve(VM_t* vm, int len)
 bool ObjStr_Intern(VM_t* vm, ObjString_t* string)
 {
     string->hash = hash_str(string->cstr, string->len);
-
-    VM_Push(vm, OBJ_VAL(string));
     bool already_there = Table_Set(&vm->strings, string, NIL_VAL());
-    VM_Pop(vm);
-
     return already_there;
 }
 
 
-#else
 
 ObjString_t* ObjStr_Steal(VM_t* vm, char* heapstr, int len)
 {
@@ -294,7 +293,6 @@ ObjString_t* ObjStr_Steal(VM_t* vm, char* heapstr, int len)
 }
 
 
-#endif /* OBJSTR_FLEXIBLE_ARR */
 
 
 void Obj_Print(FILE* fout, const Value_t val)
@@ -355,12 +353,21 @@ static void print_function(FILE* fout, const ObjFunction_t* fun)
 
 
 
-#if !defined(OBJSTR_FLEXIBLE_ARR)
 
 static ObjString_t* allocate_string(VM_t* vm, char* cstr, int len, uint32_t hash)
 {
-    ObjString_t* string = ALLOCATE_OBJ(vm, ObjString_t, OBJ_STRING);
+    ObjString_t* string;
+
+#ifdef OBJSTR_FLEXIBLE_ARR
+    string = ObjStr_Reserve(vm, len);
+    memcpy(string->cstr, cstr, len);
+    string->cstr[len] = '\0';
+    FREE_ARRAY(vm, char, cstr, len + 1);
+#else
+    string = ALLOCATE_OBJ(vm, ObjString_t, OBJ_STRING);
     string->cstr = cstr;
+#endif /* OBJSTR_FLEXIBLE_ARR */
+
     string->len = len;
     string->hash = hash;
 
@@ -368,7 +375,6 @@ static ObjString_t* allocate_string(VM_t* vm, char* cstr, int len, uint32_t hash
     return string;
 }
 
-#endif /* OBJSTR_FLEXIBLE_ARR */
 
 
 static Obj_t* allocate_obj(VM_t* vm, size_t nbytes, ObjType_t type)

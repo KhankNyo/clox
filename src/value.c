@@ -69,7 +69,7 @@ void ValArr_Free(ValueArr_t* valarr)
 
 void Value_Print(FILE* fout, Value_t val)
 {
-	switch (val.type)
+	switch (VALTYPE(val))
 	{
 	case VAL_BOOL:		fprintf(fout, AS_BOOL(val) ? "true" : "false"); break;
 	case VAL_NIL:		fprintf(fout, "nil"); break;
