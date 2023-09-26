@@ -122,10 +122,9 @@ void Allocator_KillEmAll(Allocator_t* allocator)
 
 void* Allocator_Alloc(Allocator_t* allocator, bufsize_t nbytes)
 {
-    void* ptr;
 #ifdef ALLOCATOR_DEFAULT
     (void)allocator;
-    ptr = malloc(nbytes);
+    void* ptr = malloc(nbytes);
     if (NULL == ptr) goto out_of_mem;
     return ptr;
 #else

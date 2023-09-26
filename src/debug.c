@@ -32,6 +32,9 @@ static size_t invoke_instruction(FILE* fout,
 );
 
 
+static uint64_t read_arg(const Chunk_t* chunk, size_t offset, unsigned argsize);
+
+
 
 
 
@@ -308,7 +311,7 @@ static size_t const_instruction(FILE* fout,
 {
     CLOX_ASSERT(chunk->consts.vals != NULL);
 
-	uint64_t const_addr = read_arg(chunk, offset + 1, addr_size);
+	uint64_t const_addr = read_arg(chunk, offset, addr_size);
 	fprintf(fout, INS_FMTSTR"%4zu ", mnemonic, const_addr);
 	Value_Print(fout, chunk->consts.vals[const_addr]);
 	return offset + 1 + addr_size;
@@ -322,7 +325,7 @@ static size_t bytes_instruction(FILE* fout,
 {
     CLOX_ASSERT(argsize < sizeof(uint64_t) && "Unsupported arg size");
 
-    uint64_t operand = read_arg(chunk, offset + 1, argsize);
+    uint64_t operand = read_arg(chunk, offset, argsize);
     fprintf(fout, INS_FMTSTR"%4llu", mnemonic, operand);
     return offset + 1 + argsize;
 }
@@ -332,7 +335,7 @@ static size_t jump_instruction(FILE* fout,
     const char* mnemonic, int sign, const Chunk_t* chunk, size_t offset
 )
 {
-    uint16_t jump_offset = (uint16_t)read_arg(chunk, offset + 1, 2);
+    uint16_t jump_offset = (uint16_t)read_arg(chunk, offset, 2);
 
     fprintf(fout, INS_FMTSTR"%4d -> %zu", mnemonic, jump_offset,
         offset + 3 + sign * jump_offset
@@ -346,7 +349,7 @@ static size_t invoke_instruction(FILE* fout,
     const char *mnemonic, const Chunk_t *chunk, size_t offset, size_t name_size
 )
 {
-    unsigned name = read_arg(chunk, offset + 1, name_size);
+    unsigned name = read_arg(chunk, offset, name_size);
     uint8_t argc = read_arg(chunk, offset + name_size + 1, 1);
 
     fprintf(fout, "%-16s (%d args) %4d", mnemonic, argc, name);
