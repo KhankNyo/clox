@@ -81,6 +81,9 @@ static void gc_sweep(VM_t* vm);
 
 void Allocator_Init(Allocator_t* allocator, bufsize_t initial_capacity)
 {
+#ifdef ALLOCATOR_DEFAULT
+    (void)allocator, (void)initial_capacity;
+#else
 	allocator->capacity = initial_capacity + sizeof(FreeHeader_t);
     allocator->auto_defrag = false;
 	allocator->head = malloc(initial_capacity + sizeof(FreeHeader_t));
@@ -97,15 +100,20 @@ void Allocator_Init(Allocator_t* allocator, bufsize_t initial_capacity)
 	allocator->free_head = (FreeHeader_t*)allocator->head;
     allocator->free_head->next = NULL;
     allocator->free_head->capacity = initial_capacity;
+#endif /* ALLOCATOR_DEFAULT */
 }
 
 
 void Allocator_KillEmAll(Allocator_t* allocator)
 {
+#ifdef ALLOCATOR_DEFAULT
+    (void)allocator;
+#else
 	free(allocator->head);
 	allocator->head = NULL;
 	allocator->free_head = NULL;
 	allocator->capacity = 0;
+#endif /* ALLOCATOR_DEFAULT */
 }
 
 
@@ -114,21 +122,27 @@ void Allocator_KillEmAll(Allocator_t* allocator)
 
 void* Allocator_Alloc(Allocator_t* allocator, bufsize_t nbytes)
 {
+    void* ptr;
+#ifdef ALLOCATOR_DEFAULT
+    (void)allocator;
+    ptr = malloc(nbytes);
+    if (NULL == ptr) goto out_of_mem;
+    return ptr;
+#else
 	FreeHeader_t* node = get_free_node(allocator, nbytes);
-
-	if (NULL == node)
-	{
-		fprintf(stderr, 
-			"Out of memory, hint: initialize allocator struct at %p with more capacity\n",
-			(void*)allocator
-		);
-		exit(EXIT_FAILURE);
-	}
+	if (NULL == node) goto out_of_mem;
     DEBUG_ALLOC_PRINT("\nAllocated pointer: %p, size: %u\n", GET_PTR(node), (unsigned)node->capacity);
     dbg_print_nodes(*allocator, "Allocating");
 
 
 	return GET_PTR(node);
+#endif /* ALLOCATOR_DEFAULT */
+
+
+out_of_mem:
+    fprintf(stderr, "Alloc: Out of memory trying to allocate %zu bytes\n", nbytes);
+    exit(EXIT_FAILURE);
+    return NULL;
 }
 
 
@@ -144,8 +158,16 @@ void* Allocator_Realloc(Allocator_t* allocator, void* ptr, bufsize_t newsize)
         Allocator_Free(allocator, ptr);
         return NULL;
     }
-
-
+#ifdef ALLOCATOR_DEFAULT
+    ptr = realloc(ptr, newsize);
+    if (NULL == ptr)
+    {
+        fprintf(stderr, "Realloc: Out of memory trying to allocate %zu bytes\n", newsize);
+        exit(EXIT_FAILURE);
+        return NULL;
+    }
+    return ptr;
+#else
     FreeHeader_t* header = GET_HEADER(ptr);
     if (header->capacity < newsize)
     {
@@ -161,6 +183,7 @@ void* Allocator_Realloc(Allocator_t* allocator, void* ptr, bufsize_t newsize)
         }
     }
     return ptr;
+#endif /* ALLOCATOR_DEFAULT */
 }
 
 
@@ -168,6 +191,10 @@ void* Allocator_Realloc(Allocator_t* allocator, void* ptr, bufsize_t newsize)
 
 void Allocator_Free(Allocator_t* allocator, void* ptr)
 {
+#ifdef ALLOCATOR_DEFAULT
+    free(ptr);
+    return;
+#endif /* ALLOCATOR_DEFAULT */
 	if (NULL == ptr)
 	{
 		return;
@@ -203,6 +230,10 @@ void Allocator_Free(Allocator_t* allocator, void* ptr)
 /* TODO: loop instead of recursion */
 void Allocator_Defrag(Allocator_t* allocator, size_t num_pointers)
 {
+#ifdef ALLOCATOR_DEFAULT
+    (void)allocator, (void)num_pointers;
+    return;
+#endif /* ALLOCATOR_DEFAULT */
     if (0 == num_pointers 
     || NULL == allocator->free_head
     || NULL == allocator->free_head->next)
@@ -231,9 +262,9 @@ void Allocator_Defrag(Allocator_t* allocator, size_t num_pointers)
 
 void* GC_Reallocate(VM_t* vm, void* ptr, bufsize_t oldsize, bufsize_t newsize)
 {
+    vm->bytes_allocated += newsize - oldsize;
     if (oldsize < newsize)
     {
-        vm->bytes_allocated += newsize - oldsize;
 #ifdef DEBUG_STRESS_GC
         GC_CollectGarbage(vm);
 #endif /* DEBUG_STRESS_GC */

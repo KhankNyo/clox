@@ -85,18 +85,18 @@ void Obj_Free(VM_t* vm, Obj_t* obj)
     case OBJ_STRING:
     {
         ObjString_t* str = (ObjString_t*)obj;
-#ifndef OBJSTR_FLEXIBLE_ARR
+#ifdef OBJSTR_FLEXIBLE_ARR
+        FREE_ARRAY(vm, char, str, sizeof(ObjString_t) + str->len + 1);
+#else
         FREE_ARRAY(vm, char, str->cstr, str->len + 1);
-#endif 
         FREE(vm, *str, str);
+#endif 
     }
     break;
 
     case OBJ_UPVAL:
         FREE(vm, ObjUpval_t, obj);
         break;
-
-    default: CLOX_ASSERT(false && "Unhandled Obj_Free() case"); return;
     }
 }
 
