@@ -1,0 +1,120 @@
+
+
+
+
+class Node {
+    init(val) {
+        this.next = nil;
+        this.val = val;
+    }
+}
+
+
+class List {
+    init() {
+        this.head = nil;
+        this.tail = nil;
+        this.size = 0;
+    }
+
+    pushFirstNode(val) {
+        this.head = Node(val);
+        this.tail = this.head;
+        this.size = 1;
+        return nil;
+    }
+
+    push(val) {
+        if (nil == this.head)
+            return this.pushFirstNode(val);
+        var oldval = this.tail.val;
+
+        this.tail.next = Node(val);
+        this.tail = this.tail.next;
+        this.size += 1;
+
+        return oldval;
+    }
+
+    append(index, val) {
+        if (nil == this.head) {
+            return pushFirstNode(val);
+        }
+
+        this.size += 1;
+        if (0 == index) {
+            this.size += 1;
+            var tmp = this.head;
+            this.head = Node(val);
+            this.head.next = tmp;
+            return tmp.val;
+        } else if (this.size - 2 == index) {
+            return (this.last.next = Node(val)).val;
+        }
+
+        var prev = nil;
+        var node = this.head;
+        while (index) {
+            prev = node;
+            node = node.next;
+            index -= 1;
+        }
+        (prev.next = Node(val)).next = node;
+        return node.val;
+    }
+
+    at(index) {
+        if (index >= this.size)
+            return nil;
+
+        var curr = this.head;
+        while (index) {
+            curr = curr.next;
+            index -= 1;
+        }
+        return curr.val;
+    }
+
+    remove(index) {
+        if (index >= this.size)
+            return nil;
+
+        var prev = nil;
+        var curr = this.head;
+        while (index) {
+            prev = curr;
+            curr = curr.next;
+            index -= 1;
+        }
+        
+        this.size -= 1;
+        prev.next = curr.next;
+        return curr.val;
+    }
+
+    string() {
+        var str = "[ ";
+        var node = this.head;
+        while (node) {
+            str += toStr(node.val);
+            if (nil != node.next)
+                str += ", ";
+            node = node.next;
+        }
+        return str += " ]";
+    }
+}
+
+
+
+
+var list = List();
+for (var i = 0; i < 10; i += 1) {
+    list.push(i);
+}
+
+print "size: " + toStr(list.size);
+print list.remove(1);
+print "size: " + toStr(list.size);
+print list.string();
+

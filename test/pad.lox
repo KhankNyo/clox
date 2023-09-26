@@ -1,0 +1,11 @@
+
+
+
+
+var start = clock();
+var str = "t";
+str *= 10000;
+print clock() - start;
+
+print str;
+
