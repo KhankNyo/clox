@@ -120,7 +120,7 @@ ObjString_t* Table_FindStr(Table_t* table, const char* cstr, int len, uint32_t h
         return NULL;
     }
 
-    uint32_t index = hash % table->capacity;
+    uint32_t index = hash & (table->capacity - 1);
     while (true)
     {
         Entry_t* entry = &table->entries[index];
@@ -138,8 +138,7 @@ ObjString_t* Table_FindStr(Table_t* table, const char* cstr, int len, uint32_t h
         }
 
         index += 1;
-        if (index >= table->capacity)
-            index = 0;
+        index &= table->capacity - 1;
     }
 }
 
@@ -182,7 +181,7 @@ ObjString_t* Table_FindStrs(Table_t* table,
         return NULL;
     }
 
-    uint32_t index = hash % table->capacity;
+    uint32_t index = hash & (table->capacity - 1);
     while (true)
     {
         Entry_t* entry = &table->entries[index];
@@ -209,8 +208,7 @@ find_next:
 
 
         index += 1;
-        if (index >= table->capacity)
-            index = 0;
+        index &= table->capacity - 1;
     }
 
 }
@@ -262,7 +260,7 @@ static void adjust_capacity(Table_t* table, size_t newcap)
 
 static Entry_t* find_entry(Entry_t* entries, size_t num_entries, const ObjString_t* key)
 {
-    uint32_t index = key->hash % num_entries;
+    uint32_t index = key->hash & (num_entries - 1);
     Entry_t* tombstone = NULL;
 
     /* this is not an infinite loop thanks to the load factor */
@@ -284,8 +282,7 @@ static Entry_t* find_entry(Entry_t* entries, size_t num_entries, const ObjString
         }
 
         index += 1;
-        if (index >= num_entries)
-            index = 0;
+        index &= num_entries - 1;
     }
 }
 

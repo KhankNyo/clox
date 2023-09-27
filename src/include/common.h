@@ -11,9 +11,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+
+
 #define _STR_EXPR(expr) #expr
 #define STR_EXPR(expr) _STR_EXPR(expr)
 
+#ifdef BLAZINGLY_FAST
+#  define NAN_BOXING
+#endif /* BLAZINGLY_FAST */
 
 
 #if defined(DEBUG)

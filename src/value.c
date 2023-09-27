@@ -82,6 +82,15 @@ void Value_Print(FILE* fout, Value_t val)
 
 bool Value_Equal(Value_t a, Value_t b)
 {
+#ifdef NAN_BOXING
+
+    if (IS_NUMBER(a) && IS_NUMBER(b))
+		return (AS_NUMBER(a) - FLT_EPSILON <= AS_NUMBER(b))
+			&& (AS_NUMBER(b) <= AS_NUMBER(a) + FLT_EPSILON);
+    return a == b;
+
+#else /* !NAN_BOXING */
+
 	if (a.type != b.type)
 	{
 		return false;
@@ -95,7 +104,7 @@ bool Value_Equal(Value_t a, Value_t b)
 		return (AS_NUMBER(a) - FLT_EPSILON <= AS_NUMBER(b))
 			&& (AS_NUMBER(b) <= AS_NUMBER(a) + FLT_EPSILON);
 	case VAL_OBJ:       return AS_OBJ(a) == AS_OBJ(b);
-	default: CLOX_ASSERT(false && "Unhandled Value_Equal() case"); return false;
 	}
+#endif /* NAN_BOXING*/
 }
 
