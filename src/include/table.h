@@ -83,7 +83,7 @@ ObjString_t* Table_FindStr(Table_t* table, const char* cstr, int len, uint32_t h
  *  \returns a pointer to the entry's key if found
  */
 ObjString_t* Table_FindStrs(Table_t* table, 
-    int substr_count, const ObjString_t* substr[static substr_count], 
+    int substr_count, const ObjString_t* substr[], 
     uint32_t hash, int total_len
 );
 

@@ -196,7 +196,7 @@ ObjString_t* ObjStr_Copy(VM_t* vm, const char* cstr, int len);
 /*
  *  \returns the hash of multiple strings, the given strings are treated as one
  */
-uint32_t ObjStr_HashStrs(int count, const ObjString_t* strings[static count]);
+uint32_t ObjStr_HashStrs(int count, const ObjString_t* strings[]);
 
 
     /* 
