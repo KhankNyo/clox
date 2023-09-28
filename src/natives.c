@@ -82,7 +82,7 @@ static ObjString_t* str_from_array(VM_t* vm, const ValueArr_t* array)
     for (size_t i = 0; i < array->size; i++)
     {
         str = VM_StrConcat(vm, str, str_from_val(vm, array->vals[i]));
-        str = VM_StrConcat(vm, str, (i == array->size - 1) 
+        str = VM_StrConcat(vm, str, (i != array->size - 1) 
             ? ObjStr_Copy(vm, ", ", 2)
             : ObjStr_Copy(vm, " ]", 2)
         );
