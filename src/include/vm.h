@@ -35,7 +35,11 @@ struct VM_t
     Table_t globals;
     ObjUpval_t* open_upvals;
     Obj_t* head;
+
     ObjString_t* init_str;
+    ObjString_t* push_str;
+    ObjString_t* pop_str;
+    ObjString_t* size_str;
 
     int gray_count;
     int gray_capacity;

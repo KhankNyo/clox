@@ -41,6 +41,16 @@ void ValArr_Write(ValueArr_t* valarr, Value_t val)
 }
 
 
+void ValArr_Reserve(ValueArr_t* valarr, size_t extra)
+{
+    const size_t oldcap = valarr->capacity;
+    valarr->capacity += extra;
+    valarr->vals = GROW_ARRAY(valarr->vm, Value_t,
+        valarr->vals, oldcap, valarr->capacity
+    );
+}
+
+
 
 
 bool ValArr_Find(const ValueArr_t* valarr, Value_t val, size_t* index_out)

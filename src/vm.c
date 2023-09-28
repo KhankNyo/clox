@@ -39,13 +39,16 @@ static bool call_native(VM_t* vm, ObjNativeFn_t* native, int argc);
 
 
 static ObjUpval_t* capture_upval(VM_t* data, Value_t* bp);
-static void close_upval(VM_t* vm, Value_t* sp);
+static void close_upval(VM_t* vm, const Value_t* sp);
 
 
 static void define_method(VM_t* vm, ObjString_t* class_name);
 static bool bind_method(VM_t* vm, ObjClass_t* klass, ObjString_t* name);
 static bool invoke_method(VM_t* vm, const ObjString_t* method_name, int argc);
 static bool invoke_class_method(VM_t* vm, ObjClass_t* klass, const ObjString_t* method_name, int argc);
+
+static Value_t* array_index(VM_t* vm, Value_t array, Value_t index);
+static bool array_method(VM_t* vm, Value_t array, const ObjString_t* name, int argc);
 
 
 
@@ -58,8 +61,13 @@ void VM_Init(VM_t* vm, Allocator_t* alloc)
 {
     init_state(vm, alloc);
     vm->init_str = ObjStr_Copy(vm, "init", 4);
+    vm->push_str = ObjStr_Copy(vm, "push", 4);
+    vm->pop_str = ObjStr_Copy(vm, "pop", 3);
+    vm->size_str = ObjStr_Copy(vm, "size", 4);
+
     CLOX_ASSERT(VM_DefineNative(vm, "clock", Native_Clock, 0));
     CLOX_ASSERT(VM_DefineNative(vm, "toStr", Native_ToStr, 1));
+    CLOX_ASSERT(VM_DefineNative(vm, "Array", Native_Array, 0));
 }
 
 void VM_Reset(VM_t* vm)
@@ -298,11 +306,12 @@ do{\
 
 #define GET_PROPERTY(readstr_macro) \
     do {\
-        if (!IS_INSTANCE(peek(vm, 0))) {\
+        Value_t val = peek(vm, 0);\
+        if (!IS_OBJ(val) || !IS_INSTANCE(val)) {\
             runtime_error(vm, "Only instances have properties."); \
             return INTERPRET_RUNTIME_ERROR; \
         } \
-        ObjInstance_t* inst = AS_INSTANCE(peek(vm, 0));\
+        ObjInstance_t* inst = AS_INSTANCE(val);\
         ObjString_t* name = readstr_macro();\
         Value_t field_val = NIL_VAL();\
         if (Table_Get(&inst->fields, name, &field_val)) {\
@@ -353,7 +362,7 @@ do{\
     {
         debug_trace_execution(vm);
         CLOX_ASSERT(vm->sp >= &vm->stack[0]);
-        uint8_t ins = READ_BYTE();
+        Opc_t ins = READ_BYTE();
 
         switch (ins)
         {
@@ -646,15 +655,55 @@ do{\
         }
         break;
 
-        case OP_METHOD:
+        case OP_METHOD: define_method(vm, READ_STR()); break;
+
+
+        case OP_GET_INDEX:
         {
-            define_method(vm, READ_STR());
+            Value_t index = POP();
+            Value_t array = POP();
+            Value_t* val = array_index(vm, array, index);
+            if (NULL == val)
+            {
+                return INTERPRET_RUNTIME_ERROR;
+            }
+            PUSH(*val);
+        }
+        break;
+        case OP_SET_INDEX:
+        {
+            Value_t set = POP();
+            Value_t index = POP();
+            Value_t array = POP();
+            Value_t* val = array_index(vm, array, index);
+            if (NULL == val)
+            {
+                return INTERPRET_RUNTIME_ERROR;
+            }
+            *val = set;
+            PUSH(set);
+        }
+        break;
+
+        case OP_INITIALIZER:
+        {
+            unsigned list_size = READ_LONG();
+            Value_t* begin = vm->sp - list_size;
+
+            ObjArray_t* obj = ObjArr_Create(vm);
+            PUSH(OBJ_VAL(obj));
+
+            ValArr_Reserve(&obj->array, list_size);
+            memcpy(obj->array.vals, begin, sizeof(*begin) * list_size);
+            obj->array.size = list_size;
+
+            vm->sp -= list_size + 1;
+            PUSH(OBJ_VAL(obj));
         }
         break;
 
 
         
-        default: break;
         }
     }
 
@@ -691,7 +740,11 @@ static void init_state(VM_t* vm, Allocator_t* alloc)
     vm->alloc = alloc;
     vm->compiler = NULL;
     vm->frame_count = 0;
+
     vm->init_str = NULL;
+    vm->push_str = NULL;
+    vm->pop_str = NULL;
+    vm->size_str = NULL;
 
     vm->gray_count = 0;
     vm->gray_capacity = 0;
@@ -931,7 +984,7 @@ static ObjUpval_t* capture_upval(VM_t* vm, Value_t* bp)
 
 
 
-static void close_upval(VM_t* vm, Value_t* bp)
+static void close_upval(VM_t* vm, const Value_t* bp)
 {
     while (NULL != vm->open_upvals 
         && vm->open_upvals->location >= bp)
@@ -979,7 +1032,10 @@ static bool bind_method(VM_t* vm, ObjClass_t* klass, ObjString_t* name)
 static bool invoke_method(VM_t* vm, const ObjString_t* method_name, int argc)
 {
     Value_t receiver = peek(vm, argc);
-
+    if (IS_ARRAY(receiver))
+    {
+        return array_method(vm, receiver, method_name, argc);
+    }
     if (!IS_INSTANCE(receiver))
     {
         runtime_error(vm, "Only instances have methods.");
@@ -1008,6 +1064,85 @@ static bool invoke_class_method(VM_t* vm, ObjClass_t* klass, const ObjString_t* 
         return false;
     }
     return call(vm, AS_CLOSURE(method), argc);
+}
+
+
+
+static Value_t* array_index(VM_t* vm, Value_t array, Value_t index)
+{
+    if (!IS_OBJ(array) || !IS_ARRAY(array))
+    {
+        runtime_error(vm, "Indexed value is not an array.");
+        return NULL;
+    }
+
+    if (!IS_NUMBER(index))
+    {
+        runtime_error(vm, "Indexing value is not a number.");
+        return NULL;
+    }
+
+
+    ValueArr_t* arr = &(AS_ARRAY(array)->array);
+    uint64_t i = AS_NUMBER(index);
+    if (i >= arr->size)
+    {
+        runtime_error(vm, 
+            "Index out of bound: %"PRIu64" >= array size: %"PRIu64" elements.", 
+            i, arr->size
+        );
+        return NULL;
+    }
+
+    return &arr->vals[i];
+}
+
+
+
+static bool array_method(VM_t* vm, Value_t value, const ObjString_t* method_name, int argc)
+{
+    ValueArr_t* array = &AS_ARRAY(value)->array;
+    Value_t retval = NIL_VAL();
+    int expect_argc = 0;
+
+    if (ObjStr_Equal(vm->push_str, method_name))
+    {
+        expect_argc = 1;
+        if (argc != expect_argc) goto error_argc;
+
+        ValArr_Write(array, peek(vm, 0));
+        retval = array->vals[array->size - 1];
+    }
+    else if (ObjStr_Equal(vm->pop_str, method_name))
+    {
+        if (argc != expect_argc) goto error_argc;
+
+        if (array->size != 0)
+        {
+            retval = array->vals[array->size - 1];
+            array->size -= 1;
+        }
+    }
+    else if (ObjStr_Equal(vm->size_str, method_name)) 
+    {
+        if (argc != expect_argc) goto error_argc;
+        retval = NUMBER_VAL(array->size);
+    }
+    else 
+    {
+        runtime_error(vm, "Undefined array method: %s", method_name->cstr);
+        return false;
+    }
+
+    vm->sp -= argc + 1;
+    VM_Push(vm, retval);
+    return true;
+
+error_argc:
+    runtime_error(vm, "Expected %d arguments to array method, got %d instead.", 
+        argc, expect_argc
+    );
+    return false;
 }
 
 

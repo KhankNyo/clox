@@ -11,11 +11,12 @@
 
 
 
+static ObjString_t* str_from_array(VM_t* vm, const ValueArr_t* arr);
 static ObjString_t* str_from_val(VM_t* vm, Value_t val);
 static ObjString_t* str_from_number(VM_t* vm, double number);
 static ObjString_t* str_from_obj(VM_t* vm, Value_t val);
 static ObjString_t* str_from_fun(VM_t* vm, const ObjFunction_t* fun);
-static ObjString_t* str_from_valid_entries(VM_t* vm, const Table_t table);
+static ObjString_t* str_from_table(VM_t* vm, const Table_t table);
 
 
 
@@ -32,6 +33,15 @@ Value_t Native_ToStr(VM_t* vm, int argc, Value_t* argv)
     (void)argc;
     return OBJ_VAL(str_from_val(vm, argv[0]));
 }
+
+
+Value_t Native_Array(VM_t* vm, int argc, Value_t* argv)
+{
+    (void)argc, (void)argv;
+    return OBJ_VAL(ObjArr_Create(vm));
+}
+
+
 
 
 
@@ -61,6 +71,21 @@ static ObjString_t* str_from_val(VM_t* vm, Value_t val)
     case VAL_OBJ:
         str = str_from_obj(vm, val);
         break;
+    }
+    return str;
+}
+
+
+static ObjString_t* str_from_array(VM_t* vm, const ValueArr_t* array)
+{
+    ObjString_t* str = ObjStr_Copy(vm, "[ ", 2);
+    for (size_t i = 0; i < array->size; i++)
+    {
+        str = VM_StrConcat(vm, str, str_from_val(vm, array->vals[i]));
+        str = VM_StrConcat(vm, str, (i == array->size - 1) 
+            ? ObjStr_Copy(vm, ", ", 2)
+            : ObjStr_Copy(vm, " ]", 2)
+        );
     }
     return str;
 }
@@ -107,7 +132,7 @@ static ObjString_t* str_from_obj(VM_t* vm, Value_t val)
         str = VM_StrConcat(vm, str, tmp);
         return VM_StrConcat(vm, 
             str, 
-            str_from_valid_entries(vm, instance->fields)
+            str_from_table(vm, instance->fields)
         );
     }
     break;
@@ -128,6 +153,9 @@ static ObjString_t* str_from_obj(VM_t* vm, Value_t val)
 
     case OBJ_NATIVE:
         return ObjStr_Copy(vm, "<native fn>", 9);
+
+    case OBJ_ARRAY:
+        return str_from_array(vm, &AS_ARRAY(val)->array);
     }
 
     return ObjStr_Copy(vm, "", 0);
@@ -146,7 +174,7 @@ static ObjString_t* str_from_fun(VM_t* vm, const ObjFunction_t* fun)
 
 
 
-static ObjString_t* str_from_valid_entries(VM_t* vm, const Table_t table)
+static ObjString_t* str_from_table(VM_t* vm, const Table_t table)
 {
     ObjString_t* str = NULL;
     for (size_t i = 0; i < table.capacity; i++)

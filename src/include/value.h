@@ -128,6 +128,7 @@ typedef struct
 
 
 void ValArr_Init(ValueArr_t* valarr, VM_t* vm);
+void ValArr_Reserve(ValueArr_t* valarr, size_t extra);
 void ValArr_Write(ValueArr_t* valarr, Value_t val);
 bool ValArr_Find(const ValueArr_t* valarr, Value_t val, size_t* index_out);
 void ValArr_Free(ValueArr_t* valarr);

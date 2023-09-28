@@ -18,6 +18,7 @@
 #define HASH_BYTE(prev_hash, ch) (((prev_hash) ^ (uint8_t)(ch)) * 16777619)
 
 
+static void print_array(FILE* fout, const ValueArr_t* array);
 static void print_function(FILE* fout, const ObjFunction_t* fun);
 
 static ObjString_t* allocate_string(VM_t* vm, char* cstr, int len, uint32_t hash);
@@ -38,6 +39,14 @@ void Obj_Free(VM_t* vm, Obj_t* obj)
     DEBUG_GC_PRINT("%p free object type %d\n", (void*)obj, obj->type);
     switch (obj->type)
     {
+    case OBJ_ARRAY:
+    {
+        ObjArray_t* arr = (ObjArray_t*)obj;
+        ValArr_Free(&arr->array);
+        FREE(vm, ObjArray_t, arr);
+    }
+    break;
+
     case OBJ_BOUND_METHOD:
     {
         FREE(vm, ObjBoundMethod_t, obj);
@@ -104,6 +113,16 @@ void Obj_Free(VM_t* vm, Obj_t* obj)
 
 
 
+
+
+
+ObjArray_t* ObjArr_Create(VM_t* vm)
+{
+    ObjArray_t* arr = ALLOCATE_OBJ(vm, ObjArray_t, OBJ_ARRAY);
+
+    ValArr_Init(&arr->array, vm);
+    return arr;
+}
 
 
 
@@ -299,6 +318,10 @@ void Obj_Print(FILE* fout, const Value_t val)
 {
     switch (OBJ_TYPE(val))
     {
+    case OBJ_ARRAY:
+        print_array(fout, &AS_ARRAY(val)->array);
+        break;
+
     case OBJ_BOUND_METHOD:
         print_function(fout, AS_BOUND_METHOD(val)->method->fun);
         break;
@@ -341,6 +364,20 @@ void Obj_Print(FILE* fout, const Value_t val)
 
 
 
+
+
+
+static void print_array(FILE* fout, const ValueArr_t* array)
+{
+    fprintf(fout, "<[ ");
+    for (size_t i = 0; i < array->size; i++)
+    {
+        Value_Print(fout, array->vals[i]);
+        if (i != array->size - 1)
+            fprintf(fout, ", ");
+    }
+    fprintf(fout, " ]>");
+}
 
 
 static void print_function(FILE* fout, const ObjFunction_t* fun)

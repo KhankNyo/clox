@@ -13,6 +13,7 @@ typedef struct ObjNativeFn_t ObjNativeFn_t;
 typedef struct ObjClass_t ObjClass_t;
 typedef struct ObjInstance_t ObjInstance_t;
 typedef struct ObjBoundMethod_t ObjBoundMethod_t;
+typedef struct ObjArray_t ObjArray_t;
 
 #endif /* _CLOX_TYPEDEFS_H_ */
 

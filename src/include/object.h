@@ -21,6 +21,7 @@ typedef Value_t (*NativeFn_t)(VM_t* vm, int argc, Value_t* argv);
 #define IS_CLASS(value)     is_objtype(value, OBJ_CLASS)
 #define IS_INSTANCE(value)  is_objtype(value, OBJ_INSTANCE)
 #define IS_BOUND_METHOD(val)is_objtype(val, OBJ_BOUND_METHOD)
+#define IS_ARRAY(value)     is_objtype(value, OBJ_ARRAY)
 
 #define AS_STR(value)       ((ObjString_t*)AS_OBJ(value))
 #define AS_CSTR(value)      (AS_STR(value)->cstr)
@@ -30,6 +31,7 @@ typedef Value_t (*NativeFn_t)(VM_t* vm, int argc, Value_t* argv);
 #define AS_CLASS(value)     ((ObjClass_t*)AS_OBJ(value))
 #define AS_INSTANCE(value)  ((ObjInstance_t*)AS_OBJ(value))
 #define AS_BOUND_METHOD(val)((ObjBoundMethod_t*)AS_OBJ(val))
+#define AS_ARRAY(value)     ((ObjArray_t*)AS_OBJ(value))
 
 
 typedef enum ObjType_t
@@ -42,6 +44,7 @@ typedef enum ObjType_t
     OBJ_CLASS,
     OBJ_INSTANCE,
     OBJ_BOUND_METHOD,
+    OBJ_ARRAY,
 } ObjType_t;
 
 struct Obj_t
@@ -53,6 +56,15 @@ struct Obj_t
 
 
 
+
+
+
+struct ObjArray_t
+{
+    Obj_t obj;
+
+    ValueArr_t array;
+};
 
 
 struct ObjBoundMethod_t
@@ -184,6 +196,11 @@ ObjInstance_t* ObjIns_Create(VM_t* vm, ObjClass_t* klass);
  */
 ObjBoundMethod_t* ObjBmd_Create(VM_t* vm, Value_t receiver, ObjClosure_t* method);
 
+/* 
+ * Creates a new array object 
+ */
+ObjArray_t* ObjArr_Create(VM_t* vm);
+
 
 
 
@@ -192,6 +209,9 @@ ObjBoundMethod_t* ObjBmd_Create(VM_t* vm, Value_t receiver, ObjClosure_t* method
  *  \returns a pointer to the newly created ObjString_t object
  */
 ObjString_t* ObjStr_Copy(VM_t* vm, const char* cstr, int len);
+
+/* compare if the strings in a and b are equal */
+#define ObjStr_Equal(a, b) ((a) == (b))
 
 /*
  *  \returns the hash of multiple strings, the given strings are treated as one

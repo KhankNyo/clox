@@ -274,7 +274,7 @@ static Entry_t* find_entry(Entry_t* entries, size_t num_entries, const ObjString
             else if (tombstone == NULL) /* tombstone, and not encountered tombstone b4 */
                 tombstone = entry;
         }
-        else if (entry->key == key) 
+        else if (ObjStr_Equal(entry->key, key)) 
             /* addr cmp is ok because strings are interned, 
              * so there are no duplicate strs at difference addrs */
         {

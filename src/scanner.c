@@ -160,6 +160,8 @@ Token_t Scanner_ScanToken(Scanner_t* scanner)
     case ';': return make_token(scanner, TOKEN_SEMICOLON);
     case ',': return make_token(scanner, TOKEN_COMMA);
     case '.': return make_token(scanner, TOKEN_DOT);
+    case '[': return make_token(scanner, TOKEN_LEFT_BRACKET);
+    case ']': return make_token(scanner, TOKEN_RIGHT_BRACKET);
 
 
     case '-': 

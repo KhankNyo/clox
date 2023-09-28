@@ -42,6 +42,8 @@ typedef enum TokenType_t
     // extensions
     TOKEN_PLUS_EQUAL, TOKEN_MINUS_EQUAL,
     TOKEN_SLASH_EQUAL, TOKEN_STAR_EQUAL,
+    TOKEN_LEFT_BRACKET, TOKEN_RIGHT_BRACKET,
+    TOKEN_TYPE_COUNT,
 } TokenType_t;
 
 

@@ -56,6 +56,11 @@ typedef enum Opc_t
 
 	/* challenges/extensions */
     OP_DUP,
+
+    OP_INITIALIZER,
+    OP_GET_INDEX,
+    OP_SET_INDEX,
+
     OP_POPN                 = OP_POP | 0x80,
 	OP_CONSTANT_LONG        = OP_CONSTANT | 0x80,
     OP_DEFINE_GLOBAL_LONG   = OP_DEFINE_GLOBAL | 0x80,

@@ -265,6 +265,17 @@ size_t Disasm_Instruction(FILE* fout, const Chunk_t* chunk, size_t offset)
         break;
 
 
+    case OP_SET_INDEX:
+        offset = single_byte(fout, "OP_SET_INDEX", offset);
+        break;
+    case OP_GET_INDEX:
+        offset = single_byte(fout, "OP_GET_INDEX", offset);
+        break;
+    case OP_INITIALIZER:
+        offset = bytes_instruction(fout, "OP_INITIALIZER", chunk, offset, 3);
+        break;
+
+
 
 
 
@@ -352,7 +363,7 @@ static size_t invoke_instruction(FILE* fout,
     unsigned name = read_arg(chunk, offset, name_size);
     uint8_t argc = read_arg(chunk, offset + name_size + 1, 1);
 
-    fprintf(fout, "%-16s (%d args) %4d", mnemonic, argc, name);
+    fprintf(fout, INS_FMTSTR"(%d args) %4u ", mnemonic, argc, name);
     Value_Print(fout, chunk->consts.vals[name]);
     fputc('\n', fout);
     return offset + 1 + name_size + 1;

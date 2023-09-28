@@ -604,7 +604,12 @@ static void gc_mark_root(VM_t* vm)
 
     Table_Mark(&vm->globals);
     Compiler_MarkObj(vm->compiler);
+
+
     GC_MarkObj(vm, (Obj_t*)vm->init_str);
+    GC_MarkObj(vm, (Obj_t*)vm->push_str);
+    GC_MarkObj(vm, (Obj_t*)vm->pop_str);
+    GC_MarkObj(vm, (Obj_t*)vm->size_str);
 }
 
 
@@ -632,6 +637,13 @@ static void gc_blacken_obj(VM_t* vm, Obj_t* obj)
     case OBJ_NATIVE:
     case OBJ_STRING:
         break;
+
+    case OBJ_ARRAY:
+    {
+        ObjArray_t* arr = (ObjArray_t*)obj;
+        gc_mark_valarr(vm, &arr->array);
+    }
+    break;
 
     case OBJ_BOUND_METHOD:
     {
