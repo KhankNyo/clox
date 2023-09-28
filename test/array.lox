@@ -1,0 +1,36 @@
+
+
+fun bench(n)
+{
+    var start = clock();
+    var a = Array();
+    var i = 0;
+    while (i < n) {
+        a.push(i);
+        i += 1;
+    }
+    print clock() - start;
+}
+
+
+fun correctness()
+{
+    var standard = { 1, 2, 3 };
+    print "standard array: " + toStr( standard );
+
+    class Test { init() {this.greeting = "hi";} }
+    var multiobj = { "hello, world", 1, Test() };
+    print "different objects: " + toStr( multiobj );
+
+    var multiDimensional = {
+        {1, 2},
+        {3, 4}
+    };
+    print "multi dimensional array: " + toStr( multiDimensional );
+}
+
+
+correctness();
+
+
+
