@@ -28,6 +28,14 @@ typedef struct CallFrame_t
 } CallFrame_t;
 
 
+typedef struct NativeStr_t
+{
+    struct {
+        ObjString_t *push, *pop, *size;
+    } array;
+} NativeStr_t;
+
+
 struct VM_t
 {
     Allocator_t* alloc;
@@ -37,9 +45,7 @@ struct VM_t
     Obj_t* head;
 
     ObjString_t* init_str;
-    ObjString_t* push_str;
-    ObjString_t* pop_str;
-    ObjString_t* size_str;
+    NativeStr_t native;
 
     int gray_count;
     int gray_capacity;

@@ -61,9 +61,9 @@ void VM_Init(VM_t* vm, Allocator_t* alloc)
 {
     init_state(vm, alloc);
     vm->init_str = ObjStr_Copy(vm, "init", 4);
-    vm->push_str = ObjStr_Copy(vm, "push", 4);
-    vm->pop_str = ObjStr_Copy(vm, "pop", 3);
-    vm->size_str = ObjStr_Copy(vm, "size", 4);
+    vm->native.array.push = ObjStr_Copy(vm, "push", 4);
+    vm->native.array.pop = ObjStr_Copy(vm, "pop", 3);
+    vm->native.array.size = ObjStr_Copy(vm, "size", 4);
 
     CLOX_ASSERT(VM_DefineNative(vm, "clock", Native_Clock, 0));
     CLOX_ASSERT(VM_DefineNative(vm, "toStr", Native_ToStr, 1));
@@ -81,8 +81,6 @@ void VM_Reset(VM_t* vm)
 
 void VM_Free(VM_t* vm)
 {
-    vm->init_str = NULL; /* fuck gc */
-
     Allocator_Free(vm->alloc, vm->gray_stack);
     VM_FreeObjects(vm);
     Table_Free(&vm->strings);
@@ -742,9 +740,9 @@ static void init_state(VM_t* vm, Allocator_t* alloc)
     vm->frame_count = 0;
 
     vm->init_str = NULL;
-    vm->push_str = NULL;
-    vm->pop_str = NULL;
-    vm->size_str = NULL;
+    vm->native.array.push = NULL;
+    vm->native.array.pop = NULL;
+    vm->native.array.size = NULL;
 
     vm->gray_count = 0;
     vm->gray_capacity = 0;
@@ -1105,7 +1103,7 @@ static bool array_method(VM_t* vm, Value_t value, const ObjString_t* method_name
     Value_t retval = NIL_VAL();
     int expect_argc = 0;
 
-    if (ObjStr_Equal(vm->push_str, method_name))
+    if (ObjStr_Equal(vm->native.array.push, method_name))
     {
         expect_argc = 1;
         if (argc != expect_argc) goto error_argc;
@@ -1113,7 +1111,7 @@ static bool array_method(VM_t* vm, Value_t value, const ObjString_t* method_name
         ValArr_Write(array, peek(vm, 0));
         retval = array->vals[array->size - 1];
     }
-    else if (ObjStr_Equal(vm->pop_str, method_name))
+    else if (ObjStr_Equal(vm->native.array.pop, method_name))
     {
         if (argc != expect_argc) goto error_argc;
 
@@ -1123,7 +1121,7 @@ static bool array_method(VM_t* vm, Value_t value, const ObjString_t* method_name
             array->size -= 1;
         }
     }
-    else if (ObjStr_Equal(vm->size_str, method_name)) 
+    else if (ObjStr_Equal(vm->native.array.size, method_name)) 
     {
         if (argc != expect_argc) goto error_argc;
         retval = NUMBER_VAL(array->size);

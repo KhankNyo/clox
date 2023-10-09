@@ -11,12 +11,12 @@
 
 
 
-static ObjString_t* str_from_array(VM_t* vm, const ValueArr_t* arr);
-static ObjString_t* str_from_val(VM_t* vm, Value_t val);
+static ObjString_t* str_from_array(VM_t* vm, const ValueArr_t* arr, bool recurse);
+static ObjString_t* str_from_val(VM_t* vm, Value_t val, bool recurse);
 static ObjString_t* str_from_number(VM_t* vm, double number);
-static ObjString_t* str_from_obj(VM_t* vm, Value_t val);
+static ObjString_t* str_from_obj(VM_t* vm, Value_t val, bool recurse);
 static ObjString_t* str_from_fun(VM_t* vm, const ObjFunction_t* fun);
-static ObjString_t* str_from_table(VM_t* vm, const Table_t table);
+static ObjString_t* str_from_table(VM_t* vm, const Table_t table, bool recurse);
 
 
 
@@ -31,7 +31,7 @@ Value_t Native_Clock(VM_t* vm, int argc, Value_t* argv)
 Value_t Native_ToStr(VM_t* vm, int argc, Value_t* argv)
 {
     (void)argc;
-    return OBJ_VAL(str_from_val(vm, argv[0]));
+    return OBJ_VAL(str_from_val(vm, argv[0], true));
 }
 
 
@@ -48,7 +48,7 @@ Value_t Native_Array(VM_t* vm, int argc, Value_t* argv)
 
 
 
-static ObjString_t* str_from_val(VM_t* vm, Value_t val)
+static ObjString_t* str_from_val(VM_t* vm, Value_t val, bool recurse)
 {
     ObjString_t* str = NULL;
     switch (VALTYPE(val))
@@ -69,24 +69,32 @@ static ObjString_t* str_from_val(VM_t* vm, Value_t val)
         break;
 
     case VAL_OBJ:
-        str = str_from_obj(vm, val);
+        str = str_from_obj(vm, val, recurse);
         break;
     }
     return str;
 }
 
 
-static ObjString_t* str_from_array(VM_t* vm, const ValueArr_t* array)
+static ObjString_t* str_from_array(VM_t* vm, const ValueArr_t* array, bool recurse)
 {
+    if (!recurse)
+        return ObjStr_Copy(vm, "<array>", 7);
+
     ObjString_t* str = ObjStr_Copy(vm, "[ ", 2);
+    ObjString_t* comma = ObjStr_Copy(vm, ", ", 2);
+    VM_Push(vm, OBJ_VAL(comma)); /* in case of the gc */
+
     for (size_t i = 0; i < array->size; i++)
     {
-        str = VM_StrConcat(vm, str, str_from_val(vm, array->vals[i]));
+        str = VM_StrConcat(vm, str, str_from_val(vm, array->vals[i], false));
         str = VM_StrConcat(vm, str, (i != array->size - 1) 
-            ? ObjStr_Copy(vm, ", ", 2)
+            ? comma
             : ObjStr_Copy(vm, " ]", 2)
         );
     }
+
+    VM_Pop(vm);
     return str;
 }
 
@@ -99,7 +107,7 @@ static ObjString_t* str_from_number(VM_t* vm, double number)
 }
 
 
-static ObjString_t* str_from_obj(VM_t* vm, Value_t val)
+static ObjString_t* str_from_obj(VM_t* vm, Value_t val, bool recurse)
 {
     switch (OBJ_TYPE(val))
     {
@@ -127,13 +135,17 @@ static ObjString_t* str_from_obj(VM_t* vm, Value_t val)
             instance->klass->name->cstr, 
             instance->klass->name->len
         );
-
-        ObjString_t* tmp = ObjStr_Copy(vm, " instance:\n  ", 13);
-        str = VM_StrConcat(vm, str, tmp);
-        return VM_StrConcat(vm, 
-            str, 
-            str_from_table(vm, instance->fields)
-        );
+        VM_Push(vm, OBJ_VAL(str));
+        {
+            ObjString_t* tmp = ObjStr_Copy(vm, " instance:\n  ", 13);
+            str = VM_StrConcat(vm, str, tmp);
+            str = VM_StrConcat(vm, 
+                str, 
+                str_from_table(vm, instance->fields, recurse)
+            );
+        }
+        VM_Pop(vm);
+        return str;
     }
     break;
 
@@ -155,7 +167,7 @@ static ObjString_t* str_from_obj(VM_t* vm, Value_t val)
         return ObjStr_Copy(vm, "<native fn>", 9);
 
     case OBJ_ARRAY:
-        return str_from_array(vm, &AS_ARRAY(val)->array);
+        return str_from_array(vm, &AS_ARRAY(val)->array, recurse);
     }
 
     return ObjStr_Copy(vm, "", 0);
@@ -174,8 +186,11 @@ static ObjString_t* str_from_fun(VM_t* vm, const ObjFunction_t* fun)
 
 
 
-static ObjString_t* str_from_table(VM_t* vm, const Table_t table)
+static ObjString_t* str_from_table(VM_t* vm, const Table_t table, bool recurse)
 {
+    if (!recurse)
+        return ObjStr_Copy(vm, "<table>", 7);
+
     ObjString_t* str = NULL;
     for (size_t i = 0; i < table.capacity; i++)
     {
@@ -187,7 +202,7 @@ static ObjString_t* str_from_table(VM_t* vm, const Table_t table)
         else 
             str = VM_StrConcat(vm, str, entry->key);
         str = VM_StrConcat(vm, str, ObjStr_Copy(vm, ": ", 2));
-        str = VM_StrConcat(vm, str, str_from_val(vm, entry->val));
+        str = VM_StrConcat(vm, str, str_from_val(vm, entry->val, false));
         str = VM_StrConcat(vm, str, ObjStr_Copy(vm, ",\n  ", 4));
     }
     if (NULL == str)

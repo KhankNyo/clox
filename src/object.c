@@ -18,7 +18,8 @@
 #define HASH_BYTE(prev_hash, ch) (((prev_hash) ^ (uint8_t)(ch)) * 16777619)
 
 
-static void print_array(FILE* fout, const ValueArr_t* array);
+static void print_obj(FILE* fout, const Value_t val, bool recurse);
+static void print_array(FILE* fout, const ValueArr_t* array, bool recurse);
 static void print_function(FILE* fout, const ObjFunction_t* fun);
 
 static ObjString_t* allocate_string(VM_t* vm, char* cstr, int len, uint32_t hash);
@@ -314,12 +315,21 @@ ObjString_t* ObjStr_Steal(VM_t* vm, char* heapstr, int len)
 
 
 
+
 void Obj_Print(FILE* fout, const Value_t val)
+{
+    print_obj(fout, val, true);
+}
+
+
+
+
+static void print_obj(FILE* fout, const Value_t val, bool recurse)
 {
     switch (OBJ_TYPE(val))
     {
     case OBJ_ARRAY:
-        print_array(fout, &AS_ARRAY(val)->array);
+        print_array(fout, &AS_ARRAY(val)->array, recurse);
         break;
 
     case OBJ_BOUND_METHOD:
@@ -367,16 +377,26 @@ void Obj_Print(FILE* fout, const Value_t val)
 
 
 
-static void print_array(FILE* fout, const ValueArr_t* array)
+static void print_array(FILE* fout, const ValueArr_t* array, bool recurse)
 {
-    fprintf(fout, "<[ ");
+    if (!recurse)
+    {
+        fprintf(fout, "<array>");
+        return;
+    }
+
+    fprintf(fout, "[ ");
     for (size_t i = 0; i < array->size; i++)
     {
-        Value_Print(fout, array->vals[i]);
+        if (VAL_OBJ != VALTYPE(array->vals[i]))
+            Value_Print(fout, array->vals[i]);
+        else
+            print_obj(fout, array->vals[i], false);
+
         if (i != array->size - 1)
             fprintf(fout, ", ");
     }
-    fprintf(fout, " ]>");
+    fprintf(fout, " ]");
 }
 
 

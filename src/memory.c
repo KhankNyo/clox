@@ -607,9 +607,9 @@ static void gc_mark_root(VM_t* vm)
 
 
     GC_MarkObj(vm, (Obj_t*)vm->init_str);
-    GC_MarkObj(vm, (Obj_t*)vm->push_str);
-    GC_MarkObj(vm, (Obj_t*)vm->pop_str);
-    GC_MarkObj(vm, (Obj_t*)vm->size_str);
+    GC_MarkObj(vm, (Obj_t*)vm->native.array.push);
+    GC_MarkObj(vm, (Obj_t*)vm->native.array.pop);
+    GC_MarkObj(vm, (Obj_t*)vm->native.array.size);
 }
 
 
