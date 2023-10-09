@@ -58,14 +58,14 @@ static ObjString_t* str_from_val(VM_t* vm, Value_t val, bool recurse)
         break;
 
     case VAL_NIL:
-        str = ObjStr_Copy(vm, "nil", 3);
+        str = vm->native.str.nil;
         break;
 
     case VAL_BOOL:
         if (AS_BOOL(val))
-            str = ObjStr_Copy(vm, "true", 4);
+            str = vm->native.str.true_;
         else 
-            str = ObjStr_Copy(vm, "false", 5);
+            str = vm->native.str.false_;
         break;
 
     case VAL_OBJ:
@@ -79,23 +79,16 @@ static ObjString_t* str_from_val(VM_t* vm, Value_t val, bool recurse)
 static ObjString_t* str_from_array(VM_t* vm, const ValueArr_t* array, bool recurse)
 {
     if (!recurse)
-        return ObjStr_Copy(vm, "<array>", 7);
+        return vm->native.str.array;
 
-    ObjString_t* str = ObjStr_Copy(vm, "[ ", 2);
-    ObjString_t* comma = ObjStr_Copy(vm, ", ", 2);
-    VM_Push(vm, OBJ_VAL(comma)); /* in case of the gc */
-
+    ObjString_t* str = vm->native.array.open_bracket;
     for (size_t i = 0; i < array->size; i++)
     {
         str = VM_StrConcat(vm, str, str_from_val(vm, array->vals[i], false));
-        str = VM_StrConcat(vm, str, (i != array->size - 1) 
-            ? comma
-            : ObjStr_Copy(vm, " ]", 2)
-        );
+        if (i != array->size - 1)
+            str = VM_StrConcat(vm, str, vm->native.array.comma);
     }
-
-    VM_Pop(vm);
-    return str;
+    return VM_StrConcat(vm, str, vm->native.array.close_bracket);
 }
 
 
@@ -157,20 +150,20 @@ static ObjString_t* str_from_obj(VM_t* vm, Value_t val, bool recurse)
     {
         const ObjFunction_t* fun = AS_FUNCTION(val);
         if (NULL == fun)
-            return ObjStr_Copy(vm, "<script>", 8);
+            return vm->native.str.script;
         else
             return str_from_fun(vm, fun);
     }
     break;
 
     case OBJ_NATIVE:
-        return ObjStr_Copy(vm, "<native fn>", 9);
+        return vm->native.str.nativefn;
 
     case OBJ_ARRAY:
         return str_from_array(vm, &AS_ARRAY(val)->array, recurse);
     }
 
-    return ObjStr_Copy(vm, "", 0);
+    return vm->native.str.empty;
 }
 
 
@@ -189,7 +182,7 @@ static ObjString_t* str_from_fun(VM_t* vm, const ObjFunction_t* fun)
 static ObjString_t* str_from_table(VM_t* vm, const Table_t table, bool recurse)
 {
     if (!recurse)
-        return ObjStr_Copy(vm, "<table>", 7);
+        return vm->native.str.table;
 
     ObjString_t* str = NULL;
     for (size_t i = 0; i < table.capacity; i++)
@@ -206,7 +199,7 @@ static ObjString_t* str_from_table(VM_t* vm, const Table_t table, bool recurse)
         str = VM_StrConcat(vm, str, ObjStr_Copy(vm, ",\n  ", 4));
     }
     if (NULL == str)
-        return ObjStr_Copy(vm, "", 0);
+        return vm->native.str.empty;
     return str;
 }
 

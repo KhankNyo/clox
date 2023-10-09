@@ -610,6 +610,18 @@ static void gc_mark_root(VM_t* vm)
     GC_MarkObj(vm, (Obj_t*)vm->native.array.push);
     GC_MarkObj(vm, (Obj_t*)vm->native.array.pop);
     GC_MarkObj(vm, (Obj_t*)vm->native.array.size);
+    GC_MarkObj(vm, (Obj_t*)vm->native.array.open_bracket);
+    GC_MarkObj(vm, (Obj_t*)vm->native.array.comma);
+    GC_MarkObj(vm, (Obj_t*)vm->native.array.close_bracket);
+
+    GC_MarkObj(vm, (Obj_t*)vm->native.str.nativefn);
+    GC_MarkObj(vm, (Obj_t*)vm->native.str.script);
+    GC_MarkObj(vm, (Obj_t*)vm->native.str.array);
+    GC_MarkObj(vm, (Obj_t*)vm->native.str.table);
+    GC_MarkObj(vm, (Obj_t*)vm->native.str.true_);
+    GC_MarkObj(vm, (Obj_t*)vm->native.str.false_);
+    GC_MarkObj(vm, (Obj_t*)vm->native.str.nil);
+    GC_MarkObj(vm, (Obj_t*)vm->native.str.empty);
 }
 
 

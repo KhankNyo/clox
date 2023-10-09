@@ -32,7 +32,13 @@ typedef struct NativeStr_t
 {
     struct {
         ObjString_t *push, *pop, *size;
+        ObjString_t *open_bracket, *comma, *close_bracket;
     } array;
+    struct {
+        ObjString_t *array, *table, *script, *nativefn;
+        ObjString_t *true_, *false_;
+        ObjString_t *empty, *nil;
+    } str;
 } NativeStr_t;
 
 

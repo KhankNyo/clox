@@ -61,9 +61,26 @@ void VM_Init(VM_t* vm, Allocator_t* alloc)
 {
     init_state(vm, alloc);
     vm->init_str = ObjStr_Copy(vm, "init", 4);
+
     vm->native.array.push = ObjStr_Copy(vm, "push", 4);
     vm->native.array.pop = ObjStr_Copy(vm, "pop", 3);
     vm->native.array.size = ObjStr_Copy(vm, "size", 4);
+    vm->native.array.open_bracket = ObjStr_Copy(vm, "[ ", 2);
+    vm->native.array.comma = ObjStr_Copy(vm, ", ", 2);
+    vm->native.array.close_bracket = ObjStr_Copy(vm, " ]", 2);
+
+    vm->native.str.nil = ObjStr_Copy(vm, "nil", 3);
+    vm->native.str.true_ = ObjStr_Copy(vm, "true", 4);
+    vm->native.str.false_ = ObjStr_Copy(vm, "false", 5);
+
+    vm->native.str.script = ObjStr_Copy(vm, "<script>", 8);
+    vm->native.str.nativefn = ObjStr_Copy(vm, "<native fn>", 11);
+    vm->native.str.array = ObjStr_Copy(vm, "<array>", 7);
+    vm->native.str.table = ObjStr_Copy(vm, "<table>", 7);
+    vm->native.str.empty = ObjStr_Copy(vm, "", 0);
+    
+
+
 
     CLOX_ASSERT(VM_DefineNative(vm, "clock", Native_Clock, 0));
     CLOX_ASSERT(VM_DefineNative(vm, "toStr", Native_ToStr, 1));
@@ -743,6 +760,18 @@ static void init_state(VM_t* vm, Allocator_t* alloc)
     vm->native.array.push = NULL;
     vm->native.array.pop = NULL;
     vm->native.array.size = NULL;
+    vm->native.array.open_bracket = NULL;
+    vm->native.array.comma = NULL;
+    vm->native.array.close_bracket = NULL;
+
+    vm->native.str.nil = NULL;
+    vm->native.str.true_ = NULL;
+    vm->native.str.true_ = NULL;
+    vm->native.str.script = NULL;
+    vm->native.str.nativefn = NULL;
+    vm->native.str.array = NULL;
+    vm->native.str.table = NULL;
+    vm->native.str.empty = NULL;
 
     vm->gray_count = 0;
     vm->gray_capacity = 0;
