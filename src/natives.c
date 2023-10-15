@@ -43,6 +43,22 @@ Value_t Native_Array(VM_t* vm, int argc, Value_t* argv)
 }
 
 
+Value_t Native_ArrayCpy(VM_t* vm, int argc, Value_t* argv)
+{
+    if (!IS_ARRAY(argv[0]))
+        return Native_Array(vm, argc, argv);
+
+    const ObjArray_t* old = (ObjArray_t*)AS_OBJ(argv[0]);
+    ObjArray_t* cpy = ObjArr_Create(vm);
+    ValArr_Reserve(&cpy->array, old->array.size);
+    memcpy(cpy->array.vals, old->array.vals, 
+        old->array.size * sizeof old->array.vals[0]
+    );
+    cpy->array.size = old->array.size;
+    return OBJ_VAL(cpy);
+}
+
+
 
 
 

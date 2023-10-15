@@ -58,6 +58,7 @@ typedef enum Opc_t
     OP_SWAP_POP,
     OP_DUP,
     OP_EXPONENT,
+    OP_PJIF, /* always pop and jump if false */
 
     OP_INITIALIZER,
     OP_GET_INDEX,

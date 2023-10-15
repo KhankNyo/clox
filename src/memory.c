@@ -226,6 +226,8 @@ void Allocator_Free(Allocator_t* allocator, void* ptr)
 }
 
 
+
+#if 0
 /* TODO: loop instead of recursion */
 void Allocator_Defrag(Allocator_t* allocator, size_t num_pointers)
 {
@@ -249,6 +251,33 @@ void Allocator_Defrag(Allocator_t* allocator, size_t num_pointers)
 
     Allocator_Defrag(allocator, num_pointers - 1);
 }
+
+#else
+
+void Allocator_Defrag(Allocator_t* alloc, size_t num_pointers)
+{
+#ifdef ALLOCATOR_DEFAULT
+    (void)alloc, (void)num_pointers;
+    return;
+#endif /* ALLOCATOR_DEFAULT */
+
+    for (size_t i = 0; 
+        NULL != alloc->free_head 
+        && NULL != alloc->free_head->next 
+        && i < num_pointers; 
+        i++)
+    {
+        FreeHeader_t* curr = alloc->free_head;
+        alloc->free_head = curr->next;
+
+        extend_capacity(alloc, curr, NODE_FREED, ANY_SIZE);
+        FreeHeader_t* tmp = curr;
+        curr = alloc->free_head;
+        insert_free_node(alloc, tmp);
+    }
+}
+
+#endif 
 
 
 

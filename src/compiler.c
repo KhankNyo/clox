@@ -986,25 +986,19 @@ static void stmt_if(Compiler_t* compiler)
 
     /*
      * expr  
-     * jif l1
-     *  pop
+     * pjif _else
      *  .. stmt ..
-     *  jmp l3
-     * l1:
-     *   pop 
+     *  jmp done
+     * _else:
      *   expr  
-     *   jif l3
-     *   pop 
+     *   pjif done
      *   .. stmt ..
-     * l3:
-     *   pop 
+     * done:
      * */
-    size_t skip_if = emit_jump(compiler, OP_JUMP_IF_FALSE);
-        emit_byte(compiler, OP_POP);
+    size_t to_else = emit_jump(compiler, OP_PJIF); 
         statement(compiler);
     size_t done_if = emit_jump(compiler, OP_JUMP);
-    patch_jump(compiler, skip_if);
-        emit_byte(compiler, OP_POP);
+    patch_jump(compiler, to_else);
         if (match(compiler, TOKEN_ELSE))
         {
             statement(compiler);
@@ -1063,13 +1057,11 @@ static void stmt_while(Compiler_t* compiler)
         expression(compiler);
         consume(compiler, TOKEN_RIGHT_PAREN, "Expected ')' after expression.");
 
-    size_t skip_while = emit_jump(compiler, OP_JUMP_IF_FALSE);
-            emit_byte(compiler, OP_POP);
+    size_t skip_while = emit_jump(compiler, OP_PJIF);
             statement(compiler);
     emit_loop(compiler, loop_begin);
 
     patch_jump(compiler, skip_while);
-    emit_byte(compiler, OP_POP);
 }
 
 
@@ -1077,18 +1069,19 @@ static void stmt_for(Compiler_t* compiler)
 {
     /*
      *  mamma mia la spaghetti
+     *  loop_init:
+     *    expr
      *  loop_head:
      *    expr 
-     *    jif loop_end
-     *    pop
+     *    pjif loop_end
      *    jmp loop_body
      *  loop_inc:
      *    expr 
-     *    pop 
-     *    jmp loop_head
+     *    pop
+     *    loop loop_head
      *  loop_body:
      *      .. stmt .. 
-     *    jmp loop_inc  
+     *    loop loop_inc  
      *  loop_end:
      */
     scope_begin(compiler);
@@ -1116,8 +1109,7 @@ static void stmt_for(Compiler_t* compiler)
         {
             expression(compiler);
             consume(compiler, TOKEN_SEMICOLON, "Expected ';' after expression.");
-            exit_jump = emit_jump(compiler, OP_JUMP_IF_FALSE);
-            emit_byte(compiler, OP_POP);
+            exit_jump = emit_jump(compiler, OP_PJIF);
         }
 
 
@@ -1128,10 +1120,11 @@ static void stmt_for(Compiler_t* compiler)
             size_t to_body = emit_jump(compiler, OP_JUMP);
             increment_start = current_chunk(compiler)->size;
             expression(compiler);
-            emit_byte(compiler, OP_POP); 
             consume(compiler, TOKEN_RIGHT_PAREN, "Expected ')' after expression.");
 
+            emit_byte(compiler, OP_POP); 
             emit_loop(compiler, loop_head); /* goes to condition statement */
+
             loop_head = increment_start;
             patch_jump(compiler, to_body);
         }
@@ -1145,7 +1138,6 @@ static void stmt_for(Compiler_t* compiler)
         if (exit_jump != (size_t)-1)
         {
             patch_jump(compiler, exit_jump);
-            emit_byte(compiler, OP_POP);
         }
     }
     scope_end(compiler);
@@ -1159,6 +1151,7 @@ static void stmt_return(Compiler_t* compiler)
         error(&compiler->parser, "Cannot return from top-level code.");
         return;
     }
+
     if (match(compiler, TOKEN_SEMICOLON))
     {
         emit_return(compiler);
@@ -1337,7 +1330,7 @@ static void expr_and(Compiler_t* compiler, bool can_assign)
 {
     (void)can_assign;
 
-    /* LHS already compiled */
+    /* expr already compiled */
     size_t skip_right = emit_jump(compiler, OP_JUMP_IF_FALSE);
         emit_byte(compiler, OP_POP);
         parse_precedence(compiler, PREC_AND);

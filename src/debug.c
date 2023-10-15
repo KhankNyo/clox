@@ -283,6 +283,10 @@ size_t Disasm_Instruction(FILE* fout, const Chunk_t* chunk, size_t offset)
         offset = single_byte(fout, "OP_SWAP_POP", offset);
         break;
 
+    case OP_PJIF:
+        offset = jump_instruction(fout, "OP_PJIF", 1, chunk, offset);
+        break;
+
 
 
 

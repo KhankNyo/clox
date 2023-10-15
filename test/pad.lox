@@ -4,6 +4,7 @@
 
 var start = clock();
 var str = "t";
-str *= 1000;
+str *= 2000000;
 print clock() - start;
+
 

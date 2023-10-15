@@ -86,6 +86,7 @@ void VM_Init(VM_t* vm, Allocator_t* alloc)
     CLOX_ASSERT(VM_DefineNative(vm, "clock", Native_Clock, 0));
     CLOX_ASSERT(VM_DefineNative(vm, "toStr", Native_ToStr, 1));
     CLOX_ASSERT(VM_DefineNative(vm, "Array", Native_Array, 0));
+    CLOX_ASSERT(VM_DefineNative(vm, "ArrayCpy", Native_ArrayCpy, 1));
 }
 
 void VM_Reset(VM_t* vm)
@@ -422,12 +423,18 @@ do{\
             if (IS_STRING(peek(vm, 1)) && IS_NUMBER(peek(vm, 0)))
             {
                 unsigned padcount = AS_NUMBER(POP());
-                const ObjString_t* original = AS_STR(POP());
-                ObjString_t* str = ObjStr_Copy(vm, original->cstr, original->len);
-                for (unsigned i = 0; i < padcount; i++)
+                const ObjString_t* original = AS_STR(peek(vm, 0));
+
+                size_t totallen = padcount * original->len;
+                ObjString_t* str = ObjStr_Reserve(vm, totallen);
+
+                for (unsigned i = 0; i < totallen; i += original->len)
                 {
-                    str = VM_StrConcat(vm, str, original);
+                    memcpy(&str->cstr[i], original->cstr, original->len);
                 }
+
+                str->cstr[totallen] = '\0';
+                POP();
                 PUSH(OBJ_VAL(str));
             }
             else 
@@ -736,6 +743,17 @@ do{\
             Value_t val = POP();
             POP();
             PUSH(val);
+        }
+        break;
+
+        case OP_PJIF:
+        {
+            uint16_t offset = READ_SHORT();
+            /* always pop */
+            if (is_falsey(POP()))
+            {
+                GET_IP() += offset;
+            }
         }
         break;
 
