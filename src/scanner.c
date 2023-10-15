@@ -182,6 +182,8 @@ Token_t Scanner_ScanToken(Scanner_t* scanner)
     case '*': 
         if (match(scanner, '='))
             return make_token(scanner, TOKEN_STAR_EQUAL);
+        if (match(scanner, '*'))
+            return make_token(scanner, TOKEN_STAR_STAR);
         else 
             return make_token(scanner, TOKEN_STAR);
     case '!':

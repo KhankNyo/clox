@@ -55,7 +55,9 @@ typedef enum Opc_t
 
 
 	/* challenges/extensions */
+    OP_SWAP_POP,
     OP_DUP,
+    OP_EXPONENT,
 
     OP_INITIALIZER,
     OP_GET_INDEX,

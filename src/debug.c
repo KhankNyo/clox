@@ -275,6 +275,14 @@ size_t Disasm_Instruction(FILE* fout, const Chunk_t* chunk, size_t offset)
         offset = bytes_instruction(fout, "OP_INITIALIZER", chunk, offset, 3);
         break;
 
+    case OP_EXPONENT:
+        offset = single_byte(fout, "OP_EXPONENT", offset);
+        break;
+
+    case OP_SWAP_POP:
+        offset = single_byte(fout, "OP_SWAP_POP", offset);
+        break;
+
 
 
 

@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
+#include <math.h>
 
 #include "include/common.h"
 #include "include/table.h"
@@ -714,6 +715,27 @@ do{\
 
             vm->sp -= list_size + 1;
             PUSH(OBJ_VAL(obj));
+        }
+        break;
+
+        case OP_EXPONENT:
+        {
+            if (!IS_NUMBER(peek(vm, 0)) || !IS_NUMBER(peek(vm, 1)))
+            {
+                runtime_error(vm, "Operands must be numbers.");
+                return INTERPRET_RUNTIME_ERROR;
+            }
+            double b = AS_NUMBER(POP());
+            double a = AS_NUMBER(POP());
+            PUSH(NUMBER_VAL(pow(a, b)));
+        }
+        break;
+
+        case OP_SWAP_POP:
+        {
+            Value_t val = POP();
+            POP();
+            PUSH(val);
         }
         break;
 

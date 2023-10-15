@@ -28,6 +28,7 @@ typedef struct Parser_t
 
 typedef enum Precedence_t {
     PREC_NONE = 0,
+    PREC_COMMA,       // ,
     PREC_ASSIGNMENT,  // =, -=, +=, *=, /=
     PREC_OR,          // or
     PREC_AND,         // and
@@ -35,7 +36,8 @@ typedef enum Precedence_t {
     PREC_COMPARISON,  // < > <= >=
     PREC_TERM,        // + -
     PREC_FACTOR,      // * /
-    PREC_UNARY,       // ! -
+    PREC_EXPONENT,    // **
+    PREC_UNARY,       // ! - +
     PREC_CALL,        // . ()
     PREC_PRIMARY,
 } Precedence_t;
@@ -283,7 +285,7 @@ static const ParseRule_t s_rules[TOKEN_TYPE_COUNT] =
   [TOKEN_RIGHT_PAREN]   = {NULL,            NULL,           PREC_NONE},
   [TOKEN_LEFT_BRACE]    = {expr_initlist,   NULL,           PREC_NONE}, 
   [TOKEN_RIGHT_BRACE]   = {NULL,            NULL,           PREC_NONE},
-  [TOKEN_COMMA]         = {NULL,            NULL,           PREC_NONE},
+  [TOKEN_COMMA]         = {NULL,            expr_binary,    PREC_COMMA},
   [TOKEN_DOT]           = {NULL,            expr_dot,       PREC_CALL},
   [TOKEN_MINUS]         = {expr_unary,      expr_binary,    PREC_TERM},
   [TOKEN_PLUS]          = {expr_unary,      expr_binary,    PREC_TERM},
@@ -320,6 +322,7 @@ static const ParseRule_t s_rules[TOKEN_TYPE_COUNT] =
   [TOKEN_ERROR]         = {NULL,            NULL,   		PREC_NONE},
   [TOKEN_EOF]           = {NULL,            NULL,   		PREC_NONE},
 
+  [TOKEN_STAR_STAR]     = {NULL,            expr_binary,    PREC_EXPONENT},
   [TOKEN_PLUS_EQUAL]    = {NULL,            NULL,   		PREC_NONE},
   [TOKEN_MINUS_EQUAL]   = {NULL,            NULL,   		PREC_NONE},
   [TOKEN_STAR_EQUAL]    = {NULL,            NULL,   		PREC_NONE},
@@ -1184,7 +1187,7 @@ static void stmt_return(Compiler_t* compiler)
 
 static void expression(Compiler_t* compiler)
 {
-    parse_precedence(compiler, PREC_ASSIGNMENT);
+    parse_precedence(compiler, PREC_COMMA);
 }
 
 
@@ -1283,6 +1286,8 @@ static void expr_binary(Compiler_t* compiler, bool can_assign)
 
     case TOKEN_EQUAL_EQUAL:     emit_byte(compiler, OP_EQUAL); break;
     case TOKEN_BANG_EQUAL:      emit_2_bytes(compiler, OP_EQUAL, OP_NOT); break;
+    case TOKEN_STAR_STAR:       emit_byte(compiler, OP_EXPONENT); break;
+    case TOKEN_COMMA:           emit_byte(compiler, OP_SWAP_POP); break;
     default: CLOX_ASSERT(false && "Unhandled binary operator type"); return;
     }
 }
@@ -1425,7 +1430,7 @@ static uint8_t arglist(Compiler_t* compiler)
     if (!current_token_type(compiler, TOKEN_RIGHT_PAREN))
     {
         do {
-            expression(compiler);
+            parse_precedence(compiler, PREC_ASSIGNMENT);
             if (argc == MAX_ARGCOUNT)
             {
                 error(&compiler->parser, "Cannot have more than 255 arguments.");
@@ -1554,7 +1559,7 @@ static void expr_initlist(Compiler_t* compiler, bool can_assign)
     if (!current_token_type(compiler, TOKEN_RIGHT_BRACE))
     {
         do {
-            expression(compiler);
+            parse_precedence(compiler, PREC_ASSIGNMENT);
             nelem++;
         } while (match(compiler, TOKEN_COMMA));
     }
@@ -1566,8 +1571,6 @@ static void expr_initlist(Compiler_t* compiler, bool can_assign)
         nelem >> 0
     );
 }
-
-
 
 
 

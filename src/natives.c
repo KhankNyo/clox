@@ -1,6 +1,7 @@
 
 
 #include <time.h>
+#include <math.h>
 
 #include "include/common.h"
 #include "include/object.h"
