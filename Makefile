@@ -5,9 +5,11 @@ LIBS=
 
 
 ifeq ($(OS),Windows_NT)
+	# for some reason windows compiled w/o linking with math library??
 	EXEC_FMT=.exe
 else
 	EXEC_FMT=
+	LIBS+=-lm
 endif
 
 SRCS=$(wildcard src/*.c)
