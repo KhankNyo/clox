@@ -8,9 +8,6 @@
 
 
 
-typedef struct Obj_t Obj_t;
-typedef struct ObjString_t ObjString_t;
-
 
 typedef enum ValType_t
 {
