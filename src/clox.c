@@ -7,6 +7,7 @@
 #include "include/memory.h"
 #include "include/clox.h"
 #include "include/vm.h"
+#include "include/jit.h"
 
 
 
@@ -21,6 +22,7 @@ void Clox_Init(Clox_t *clox, size_t allocator_capacity)
     Allocator_Init(&clox->alloc, allocator_capacity);
     VM_Init(&clox->vm, &clox->alloc);
     clox->err = CLOX_NOERR;
+    clox->use_jit = false;
 }
 
 
@@ -39,7 +41,11 @@ void Clox_RunFile(Clox_t* clox, const char* file_path)
 {
     size_t src_size = 0;
     char* src = load_file_content(&clox->alloc, file_path, &src_size);
-    InterpretResult_t ret = VM_Interpret(&clox->vm, src);
+    InterpretResult_t ret;
+    if (clox->use_jit)
+        ret = jit_interpret(&clox->vm, src);
+    else
+        ret = VM_Interpret(&clox->vm, src);
     unload_file_content(&clox->alloc, src);
 
     if (ret == INTERPRET_COMPILE_ERROR)
@@ -79,7 +85,13 @@ void Clox_Repl(Clox_t* clox)
 
 void Clox_PrintUsage(FILE* fout, const char* program_path)
 {
-    fprintf(fout, "Usage: %s [path]\n", program_path);
+    fprintf(fout, "Usage: %s --<Options...> [path]\n"
+        "Options:\n"
+        "  --jit: use jit instead of bytecode interpreter\n"
+        "  --mem: specify max memory (default is %d bytes) "
+        "and used built-in allocator instead of malloc and free\n", 
+        program_path, CLOX_DEFAULT_ALLOC_MEMSIZE
+    );
 }
 
 

@@ -10,6 +10,10 @@
 #include "vm.h"
 
 
+#define CLOX_DEFAULT_ALLOC_MEMSIZE (5 * 1024 * 1024)
+#define CLOX_FLAG_MEM ((unsigned)1 << 0)
+#define CLOX_FLAG_JIT ((unsigned)1 << 1)
+
 typedef enum CloxUnixErr_t
 {
     CLOX_NOERR = 0,
@@ -29,6 +33,7 @@ typedef struct Clox_t
     VM_t vm;
     Allocator_t alloc;
     CloxUnixErr_t err;
+    unsigned flags;
 } Clox_t;
 
 

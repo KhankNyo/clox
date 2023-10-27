@@ -6,7 +6,16 @@
 int main(int argc, char** argv)
 {
 	Clox_t clox;
-	Clox_Init(&clox, 5 * 1024 * 1024);
+    size_t memsize = CLOX_DEFAULT_ALLOC_MEMSIZE;
+    if (argc > 2)
+    {
+        int i = 0;
+        while (i < argc - 1)
+        {
+            i += 1;
+        }
+    }
+	Clox_Init(&clox, memsize);
 	
 	if (1 == argc)
 	{
@@ -27,4 +36,10 @@ int main(int argc, char** argv)
 	Clox_Free(&clox);
 	return 0;
 }
+
+
+
+
+
+
 
