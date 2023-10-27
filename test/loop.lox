@@ -1,0 +1,13 @@
+
+
+fun loop(n)
+{
+    while (n)
+        n -= 1;
+}
+
+
+
+var start = clock();
+loop(100000000);
+print(clock() - start);

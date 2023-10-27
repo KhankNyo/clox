@@ -844,7 +844,13 @@ static Value_t peek(const VM_t* vm, int offset)
 
 static bool is_falsey(const Value_t val)
 {
-    return IS_NIL(val) 
+    return
+#ifdef BLAZINGLY_FAST
+    (0 == val) /* floating point zero */
+#else
+    0
+#endif /* BLAZINGLY_FAST */
+        || IS_NIL(val)
         || (IS_BOOL(val) && !AS_BOOL(val))
         || (IS_NUMBER(val) && Value_Equal(val, NUMBER_VAL(0.0f)));
 }
