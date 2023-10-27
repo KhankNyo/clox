@@ -115,6 +115,7 @@ bool Value_Equal(Value_t a, Value_t b)
 			&& (AS_NUMBER(b) <= AS_NUMBER(a) + FLT_EPSILON);
 	case VAL_OBJ:       return AS_OBJ(a) == AS_OBJ(b);
 	}
+    return false;
 #endif /* NAN_BOXING*/
 }
 

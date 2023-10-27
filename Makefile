@@ -1,13 +1,15 @@
-CC?=gcc
+CC=gcc
 CCF?=-Ofast -flto -std=c99 -Wall -Wextra -Wpedantic -DOBJSTR_FLEXIBLE_ARR
 LDF?=-flto
 LIBS=
 
 
 ifeq ($(OS),Windows_NT)
+	# for some reason windows compiled w/o linking with math library??
 	EXEC_FMT=.exe
 else
 	EXEC_FMT=
+	LIBS+=-lm
 endif
 
 SRCS=$(wildcard src/*.c)

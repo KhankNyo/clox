@@ -349,7 +349,7 @@ static size_t bytes_instruction(FILE* fout,
     CLOX_ASSERT(argsize < sizeof(uint64_t) && "Unsupported arg size");
 
     uint64_t operand = read_arg(chunk, offset, argsize);
-    fprintf(fout, INS_FMTSTR"%4llu", mnemonic, operand);
+    fprintf(fout, INS_FMTSTR"%4"PRIu64, mnemonic, operand);
     return offset + 1 + argsize;
 }
 
