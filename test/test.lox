@@ -1,0 +1,89 @@
+
+
+fun sortf(arr, cmpfun)
+{
+    if (!arr or arr.size() <= 1) return arr;
+
+    var i = 1;
+    var sz = arr.size();
+    while (i < sz)
+    {
+        var j = i;
+        while ((j > 0) and cmpfun(arr[j], arr[j - 1]))
+        {
+            var tmp = arr[j];
+            arr[j] = arr[j - 1];
+            arr[j - 1] = tmp;
+            j -= 1;
+        }
+        i += 1;
+    }
+
+    return arr;
+}
+
+fun sort(arr)
+{
+    if (!arr or arr.size() <= 1) return arr;
+
+    var i = 1;
+    var sz = arr.size();
+    while (i < sz)
+    {
+        var j = i;
+        while ((j > 0) and (arr[j] < arr[j - 1]))
+        {
+            var tmp = arr[j];
+            arr[j] = arr[j - 1];
+            arr[j - 1] = tmp;
+            j -= 1;
+        }
+        i += 1;
+    }
+
+    return arr;
+}
+
+
+
+fun cmpfun(a, b)
+{
+    return a < b;
+}
+
+
+var n = 1000000;
+print("Benchmarking " + toStr(n) + " iterations");
+
+var i = 0; 
+var start = clock();
+while (i < n)
+{
+    sortf({3, 4, 8, 5, 9, 2, 1}, cmpfun);
+    i += 1;
+}
+print("Temporary with cmpfun: " + toStr(clock() - start) + "s");
+
+i = 0;
+start = clock();
+while (i < n)
+{
+    sort({3, 4, 8, 5, 9, 2, 1});
+    i += 1;
+}
+print("Temporary hardcoded: " + toStr(clock() - start) + "s");
+
+i = 0;
+start = clock();
+var closure = cmpfun;
+while (i < n)
+{
+    sortf({3, 4, 8, 5, 9, 2, 1}, closure);
+    i += 1;
+}
+print("Temporary with cmpfun closure: " + toStr(clock() - start) + "s");
+
+print("Benchmark finished");
+
+
+
